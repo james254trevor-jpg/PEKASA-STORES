@@ -1,0 +1,6 @@
+{
+  "name": "PEKASA - Appliance & Shop Management",
+  "description": "Enterprise shop and appliance management system with SQLite relational storage, M-Pesa tracking, photo management, automatic invoicing, and multi-user roles.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
