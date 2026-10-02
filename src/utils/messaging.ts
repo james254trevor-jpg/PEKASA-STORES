@@ -1,13 +1,12 @@
 /**
- * Customer WhatsApp & SMS notification generator for PEKASA STORES
- * Features official phone numbers: 0727108749 / 0180366344
+ * Customer WhatsApp & SMS notification generator for PEKASA STORES Rehani Management System
+ * Official Helpline Numbers: 0727108749 / 0180366344
  */
 
 import { formatKES } from './numbering';
 import { STORE_NAME, STORE_TEL } from '../types';
 
 export function cleanKenyanPhone(phone: string): string {
-  // Normalize Kenyan phone numbers (+254, 07..., 01...)
   let clean = phone.replace(/[^0-9+]/g, '');
   if (clean.startsWith('0')) {
     clean = '254' + clean.substring(1);
@@ -22,30 +21,25 @@ export function generateWhatsAppLink(phone: string, message: string): string {
   return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
 }
 
-export interface ReminderData {
+export function createLoanDisbursalMessage(data: {
   customerName: string;
-  applianceCode: string;
-  applianceDescription: string;
-  amountDue: number;
-  dueDate: string;
-  funderName: string;
-}
-
-export function createPawnDisbursalMessage(data: {
-  customerName: string;
-  applianceCode: string;
-  applianceItem: string;
-  amountReceived: number;
+  loanNumber: string;
+  collateralNumber: string;
+  collateralItem: string;
+  principalAmount: number;
   funder: string;
   dueDate: string;
+  maturityDate: string;
+  totalDue: number;
 }): string {
   return `Habari ${data.customerName}, this is ${STORE_NAME}.
-We confirm receipt of your ${data.applianceItem} (Ref: ${data.applianceCode}).
-Cash disbursed: ${formatKES(data.amountReceived)} (Disbursed by Director ${data.funder}).
-Due Date (2-Week Cycle): ${data.dueDate}.
-Kindly retain your transaction receipt.
-Helpline: ${STORE_TEL}
-Thank you for trusting ${STORE_NAME}.`;
+We confirm issuance of your Rehani Loan (Pawn Ticket: ${data.loanNumber}).
+Pledged Collateral: ${data.collateralItem} (Ref: ${data.collateralNumber}).
+Principal Disbursed: ${formatKES(data.principalAmount)} (Disbursed by Director ${data.funder}).
+Due Date: ${data.dueDate} (Grace Period expires: ${data.maturityDate}).
+Total Amount to Redeem: ${formatKES(data.totalDue)}.
+Kindly retain your Pawn Ticket. For inquiries, contact ${STORE_TEL}.
+Thank you for choosing ${STORE_NAME}.`;
 }
 
 export function createPaymentReceiptMessage(data: {
@@ -55,33 +49,106 @@ export function createPaymentReceiptMessage(data: {
   paymentMethod: string;
   mpesaRef?: string;
   remainingBalance: number;
-  applianceCode: string;
+  loanNumber: string;
 }): string {
   const mpesaNote = data.mpesaRef ? ` [M-Pesa: ${data.mpesaRef}]` : '';
   return `Habari ${data.customerName}, ${STORE_NAME} confirms receipt of ${formatKES(data.amountPaid)} via ${data.paymentMethod}${mpesaNote}.
 Receipt No: ${data.receiptNumber}
-Appliance Ref: ${data.applianceCode}
+Rehani Loan Ref: ${data.loanNumber}
 Remaining Outstanding Balance: ${formatKES(data.remainingBalance)}.
 Official Tel: ${STORE_TEL}
-Thank you for choosing ${STORE_NAME}.`;
+Thank you for doing business with ${STORE_NAME}.`;
 }
 
-export function createDueReminderMessage(data: ReminderData): string {
-  return `Habari ${data.customerName}, friendly reminder from ${STORE_NAME} regarding your item ${data.applianceDescription} (${data.applianceCode}).
-The scheduled due date is ${data.dueDate}.
-Current outstanding amount: ${formatKES(data.amountDue)}.
-Please make arrangements with Trevor or Peter to renew or redeem your item before the due date.
-Official Tel: ${STORE_TEL}`;
+export function createDueSoonReminderMessage(data: {
+  customerName: string;
+  loanNumber: string;
+  collateralItem: string;
+  dueDate: string;
+  balanceDue: number;
+}): string {
+  return `Habari ${data.customerName}, friendly reminder from ${STORE_NAME} regarding your Rehani Loan (${data.loanNumber}) for ${data.collateralItem}.
+Contractual due date is approaching: ${data.dueDate}.
+Current amount due to redeem: ${formatKES(data.balanceDue)}.
+You may visit the shop to redeem your item or renew your loan before the deadline.
+Helpline: ${STORE_TEL}.`;
+}
+
+export function createOverdueNoticeMessage(data: {
+  customerName: string;
+  loanNumber: string;
+  collateralItem: string;
+  maturityDate: string;
+  balanceDue: number;
+}): string {
+  return `URGENT NOTICE from ${STORE_NAME}:
+Habari ${data.customerName}, your Rehani Loan (${data.loanNumber}) for ${data.collateralItem} is now OVERDUE.
+Outstanding Balance: ${formatKES(data.balanceDue)}.
+Your grace period will expire on ${data.maturityDate}.
+To prevent legal forfeiture and public disposition of your pledged collateral, kindly visit Trevor or Peter at PEKASA immediately or call ${STORE_TEL}.`;
+}
+
+export function createRenewalConfirmationMessage(data: {
+  customerName: string;
+  loanNumber: string;
+  renewalNumber: string;
+  feePaid: number;
+  newDueDate: string;
+  outstandingBalance: number;
+}): string {
+  return `Habari ${data.customerName}, ${STORE_NAME} confirms your Rehani Loan renewal (${data.renewalNumber}).
+Loan Ref: ${data.loanNumber}.
+Renewal fee paid: ${formatKES(data.feePaid)}.
+Your new extended maturity date is: ${data.newDueDate}.
+Current balance: ${formatKES(data.outstandingBalance)}.
+Official Helpline: ${STORE_TEL}.`;
+}
+
+// Backward compatibility alias
+export const createPawnDisbursalMessage = (d: any) => createLoanDisbursalMessage({
+  customerName: d.customerName,
+  loanNumber: d.applianceCode,
+  collateralNumber: d.applianceCode,
+  collateralItem: d.applianceItem,
+  principalAmount: d.amountReceived,
+  funder: d.funder,
+  dueDate: d.dueDate,
+  maturityDate: d.dueDate,
+  totalDue: d.amountReceived
+});
+
+export function createDueReminderMessage(data: {
+  customerName: string;
+  applianceCode?: string;
+  applianceDescription?: string;
+  amountDue?: number;
+  dueDate?: string;
+  funderName?: string;
+  loanNumber?: string;
+  collateralItem?: string;
+  balanceDue?: number;
+}): string {
+  const code = data.loanNumber || data.applianceCode || 'LOAN';
+  const item = data.collateralItem || data.applianceDescription || 'Pledged Item';
+  const due = data.dueDate || '';
+  const bal = data.balanceDue ?? data.amountDue ?? 0;
+  return `Habari ${data.customerName}, friendly reminder from ${STORE_NAME}.
+Your Rehani account for ${item} (Ref: ${code}) is due on ${due}.
+Amount due: ${formatKES(bal)}.
+Kindly visit PEKASA STORES or contact ${STORE_TEL}.`;
 }
 
 export function createRepairReadyMessage(data: {
   customerName: string;
-  applianceCode: string;
-  applianceItem: string;
-  repairCost: number;
+  applianceCode?: string;
+  applianceDescription?: string;
+  balanceDue?: number;
 }): string {
-  return `Habari ${data.customerName}, your ${data.applianceItem} (${data.applianceCode}) has been serviced and is ready for collection at ${STORE_NAME}.
-Total amount payable: ${formatKES(data.repairCost)}.
-Kindly come by with your National ID for collection.
-Store Tel: ${STORE_TEL}`;
+  const code = data.applianceCode || '';
+  const item = data.applianceDescription || 'Appliance/Collateral';
+  const bal = data.balanceDue ?? 0;
+  return `Habari ${data.customerName}, this is ${STORE_NAME}.
+Your item ${item} (${code}) is ready.
+Balance remaining: ${formatKES(bal)}.
+Official Tel: ${STORE_TEL}. Thank you!`;
 }

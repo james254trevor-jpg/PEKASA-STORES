@@ -145,16 +145,25 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
 
       const newPaymentObj: Payment = {
         id: payId,
+        transaction_number: rctCode,
         receipt_number: rctCode,
+        branch_id: 'br-nairobi',
+        transaction_type: 'PARTIAL_PAYMENT',
         appliance_id: formAppliance.id,
+        collateral_id: formAppliance.id,
         customer_id: formCustomer.id,
         amount: Number(amount),
+        principal_portion: Number(amount),
+        interest_portion: 0,
+        balance_after: Math.max(0, newBal),
         payment_method: paymentMethod,
+        mpesa_reference: paymentMethod === 'M-Pesa' ? mpesaCode.trim() : undefined,
         mpesa_code: paymentMethod === 'M-Pesa' ? mpesaCode.trim() : undefined,
         mpesa_phone: paymentMethod === 'M-Pesa' ? mpesaPhone.trim() : undefined,
         mpesa_sender: paymentMethod === 'M-Pesa' ? mpesaSender.trim() : undefined,
         received_by: receivedBy,
         notes: notes,
+        transaction_date: paymentDate,
         payment_date: paymentDate,
         created_at: nowStr
       };
@@ -183,12 +192,21 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
       payment: p,
       customer: cust || {
         id: 'cust-unknown',
+        customer_number: 'CUS-NA',
         name: 'Client',
         id_number: 'N/A',
         phone: 'N/A',
+        alt_phone: 'N/A',
         email: '',
         address: '',
+        county: 'Nairobi',
+        status: 'Good Standing',
         notes: '',
+        previous_loans_count: 0,
+        total_borrowed: 0,
+        total_repaid: 0,
+        current_balance: 0,
+        defaults_count: 0,
         created_at: '',
         updated_at: ''
       },
@@ -210,7 +228,7 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
       paymentMethod: p.payment_method,
       mpesaRef: p.mpesa_code,
       remainingBalance: remaining,
-      applianceCode: app ? app.appliance_number : 'N/A'
+      loanNumber: app ? (app.appliance_number || app.collateral_number) : 'N/A'
     });
     window.open(generateWhatsAppLink(cust.phone, msg), '_blank');
   };

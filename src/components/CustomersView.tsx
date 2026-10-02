@@ -9,7 +9,7 @@ import {
   ApplianceCategory, 
   APPLIANCE_CATEGORIES 
 } from '../types';
-import { formatKES, calculateDueDate } from '../utils/numbering';
+import { formatKES, calculateDueDate, calculateLoanDueDate, calculateMaturityDate, formatSequenceCode } from '../utils/numbering';
 import { generateWhatsAppLink, createPawnDisbursalMessage } from '../utils/messaging';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -93,8 +93,10 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
   const [name, setName] = useState('');
   const [idNumber, setIdNumber] = useState('');
   const [phone, setPhone] = useState('+254 ');
+  const [altPhone, setAltPhone] = useState('N/A');
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
+  const [county, setCounty] = useState('Nairobi');
   const [notes, setNotes] = useState('');
   const [newCustomerPhoto, setNewCustomerPhoto] = useState<string>('');
 
@@ -111,16 +113,54 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
   const [appCondition, setAppCondition] = useState('Good working condition, tested at counter');
   const [appMarketValue, setAppMarketValue] = useState<number>(25000);
   const [appAmountDisbursed, setAppAmountDisbursed] = useState<number>(10000);
+  const [appInterestRate, setAppInterestRate] = useState<number>(30); // 30% per 2 weeks
+  const [appInterestCharges, setAppInterestCharges] = useState<number>(3000); // 30% of 10000
+  const [appTermDays, setAppTermDays] = useState<number>(14); // Strictly maximum 14 days (2 weeks)
   const [appDateReceived, setAppDateReceived] = useState(new Date().toISOString().split('T')[0]);
   const [appDueDate, setAppDueDate] = useState(calculateDueDate(new Date().toISOString().split('T')[0]));
-  const [appInterestCharges, setAppInterestCharges] = useState<number>(1000);
   const [appNotes, setAppNotes] = useState('');
   const [appPhotos, setAppPhotos] = useState<string[]>([]);
+
+  // Update interest automatically based on 30% per two-week cycle
+  const handleAmountDisbursedChange = (newAmount: number) => {
+    setAppAmountDisbursed(newAmount);
+    const calculatedInterest = Math.round((newAmount * appInterestRate) / 100);
+    setAppInterestCharges(calculatedInterest);
+  };
+
+  const handleInterestRateChange = (newRate: number) => {
+    setAppInterestRate(newRate);
+    const calculatedInterest = Math.round((appAmountDisbursed * newRate) / 100);
+    setAppInterestCharges(calculatedInterest);
+  };
+
+  // Change term days strictly capped at maximum 14 days (2 weeks)
+  const handleTermDaysSelect = (days: number) => {
+    const capped = Math.min(14, Math.max(1, days));
+    setAppTermDays(capped);
+    setAppDueDate(calculateLoanDueDate(appDateReceived, capped));
+  };
 
   // Update due date automatically when date received changes
   const handleDateReceivedChange = (newDate: string) => {
     setAppDateReceived(newDate);
-    setAppDueDate(calculateDueDate(newDate));
+    setAppDueDate(calculateLoanDueDate(newDate, appTermDays));
+  };
+
+  // Guard against due dates exceeding the 2-week maximum
+  const handleDueDateChange = (newDate: string) => {
+    const maxDate = calculateLoanDueDate(appDateReceived, 14);
+    if (newDate > maxDate) {
+      alert(`Policy constraint: Maximum collateral duration is 2 weeks (14 days). Due date has been capped to ${maxDate}.`);
+      setAppDueDate(maxDate);
+      setAppTermDays(14);
+    } else {
+      setAppDueDate(newDate);
+      const d1 = new Date(appDateReceived).getTime();
+      const d2 = new Date(newDate).getTime();
+      const diff = Math.max(1, Math.min(14, Math.round((d2 - d1) / (1000 * 3600 * 24))));
+      setAppTermDays(diff);
+    }
   };
 
   // --- Edit Customer Form State ---
@@ -267,32 +307,59 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
     const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
 
     try {
-      // 1. Insert Customer
+      const custCode = sqliteService.getNextSequence('CUS');
+
+      // 1. Insert Customer with permanent customer profile fields
       sqliteService.run(
-        `INSERT INTO customers (id, name, id_number, phone, email, address, photo_url, notes, created_at, updated_at)
-         VALUES (:id, :name, :id_number, :phone, :email, :address, :photo_url, :notes, :created_at, :updated_at)`,
+        `INSERT INTO customers (
+          id, customer_number, name, id_number, phone, alt_phone, email, address, county,
+          photo_url, status, notes, previous_loans_count, total_borrowed, total_repaid,
+          current_balance, defaults_count, created_at, updated_at
+        ) VALUES (
+          :id, :cnum, :name, :id_number, :phone, :alt_phone, :email, :address, :county,
+          :photo_url, :status, :notes, :plc, :tb, :tr, :cb, :dc, :created_at, :updated_at
+        )`,
         {
           ':id': custId,
+          ':cnum': custCode,
           ':name': name.trim(),
           ':id_number': idNumber.trim(),
           ':phone': phone.trim(),
+          ':alt_phone': altPhone.trim() || 'N/A',
           ':email': email.trim() || null,
           ':address': address.trim() || null,
+          ':county': county.trim() || 'Nairobi',
           ':photo_url': newCustomerPhoto || null,
+          ':status': 'Good Standing',
           ':notes': notes.trim() || null,
+          ':plc': includeAppliance ? 1 : 0,
+          ':tb': includeAppliance ? Number(appAmountDisbursed) : 0,
+          ':tr': 0,
+          ':cb': includeAppliance ? (Number(appAmountDisbursed) + Number(appInterestCharges)) : 0,
+          ':dc': 0,
           ':created_at': nowStr,
           ':updated_at': nowStr
         }
       );
 
       let createdApplianceCode = '';
+      let createdLoanCode = '';
 
-      // 2. If appliance included, insert into appliances, appliance_photos, and invoices
+      // 2. If collateral item included, insert into appliances, collateral_items, and rehani_loans
       if (includeAppliance) {
         const appId = 'app-' + Date.now();
         const appCode = sqliteService.getNextSequence('APP');
+        const colId = 'col-' + Date.now();
+        const colCode = sqliteService.getNextSequence('COL');
+        const loanId = 'ln-' + Date.now();
+        const loanCode = sqliteService.getNextSequence('LN');
         createdApplianceCode = appCode;
+        createdLoanCode = loanCode;
 
+        const calculatedMaturity = calculateMaturityDate(appDueDate, 7);
+        const itemFullName = `${appBrand.trim()} ${appModel.trim()} ${appCategory}`;
+
+        // Insert into appliances (backward compatibility table)
         sqliteService.run(
           `INSERT INTO appliances (
             id, appliance_number, customer_id, category, custom_category, brand, model,
@@ -308,7 +375,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
             ':appliance_number': appCode,
             ':customer_id': custId,
             ':category': appCategory,
-            ':custom_category': appCategory === 'Other appliances' ? appCustomCategory.trim() : null,
+            ':custom_category': ((appCategory as string) === 'Other appliances' || (appCategory as string) === 'Other Collateral') ? appCustomCategory.trim() : null,
             ':brand': appBrand.trim(),
             ':model': appModel.trim(),
             ':serial_number': appSerialNumber.trim() || null,
@@ -324,6 +391,120 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
             ':notes': appNotes.trim() || null,
             ':created_at': nowStr,
             ':updated_at': nowStr
+          }
+        );
+
+        // Insert into collateral_items (Rehani Collateral Vault)
+        sqliteService.run(
+          `INSERT INTO collateral_items (
+            id, collateral_number, customer_id, branch_id, category, custom_category,
+            item_name, brand, model, serial_number, condition, market_value,
+            estimated_resale_value, max_allowed_loan, amount_offered,
+            storage_room, rack_shelf, security_tag, status, date_received, notes, created_at, updated_at
+          ) VALUES (
+            :id, :collateral_number, :customer_id, :branch_id, :category, :custom_category,
+            :item_name, :brand, :model, :serial_number, :condition, :market_value,
+            :estimated_resale_value, :max_allowed_loan, :amount_offered,
+            :storage_room, :rack_shelf, :security_tag, :status, :date_received, :notes, :created_at, :updated_at
+          )`,
+          {
+            ':id': colId,
+            ':collateral_number': colCode,
+            ':customer_id': custId,
+            ':branch_id': 'br-nairobi',
+            ':category': appCategory,
+            ':custom_category': ((appCategory as string) === 'Other appliances' || (appCategory as string) === 'Other Collateral') ? appCustomCategory.trim() : null,
+            ':item_name': itemFullName,
+            ':brand': appBrand.trim(),
+            ':model': appModel.trim(),
+            ':serial_number': appSerialNumber.trim() || null,
+            ':condition': appCondition.trim(),
+            ':market_value': Number(appMarketValue) || 0,
+            ':estimated_resale_value': Math.round((Number(appMarketValue) || 0) * 0.8),
+            ':max_allowed_loan': Math.round((Number(appMarketValue) || 0) * 0.6),
+            ':amount_offered': Number(appAmountDisbursed) || 0,
+            ':storage_room': 'Warehouse A',
+            ':rack_shelf': 'Rack B3 / Shelf 7',
+            ':security_tag': 'SEC-' + Math.floor(1000 + Math.random() * 9000),
+            ':status': 'Held (Active Loan)',
+            ':date_received': appDateReceived,
+            ':notes': appNotes.trim() || null,
+            ':created_at': nowStr,
+            ':updated_at': nowStr
+          }
+        );
+
+        // Insert into rehani_loans (Strict 30% interest per 2-week cycle, capped at 14 days)
+        sqliteService.run(
+          `INSERT INTO rehani_loans (
+            id, loan_number, customer_id, collateral_id, branch_id, principal_amount,
+            interest_rate_percent, interest_amount, storage_fee, total_amount_due,
+            amount_paid, balance_remaining, term_days, issue_date, due_date,
+            grace_period_days, maturity_date, funder, disbursement_method,
+            disbursement_reference, status, staff_issuer, notes, created_at, updated_at
+          ) VALUES (
+            :id, :loan_number, :customer_id, :collateral_id, :branch_id, :principal_amount,
+            :interest_rate_percent, :interest_amount, :storage_fee, :total_amount_due,
+            :amount_paid, :balance_remaining, :term_days, :issue_date, :due_date,
+            :grace_period_days, :maturity_date, :funder, :disbursement_method,
+            :disbursement_reference, :status, :staff_issuer, :notes, :created_at, :updated_at
+          )`,
+          {
+            ':id': loanId,
+            ':loan_number': loanCode,
+            ':customer_id': custId,
+            ':collateral_id': colId,
+            ':branch_id': 'br-nairobi',
+            ':principal_amount': Number(appAmountDisbursed),
+            ':interest_rate_percent': appInterestRate,
+            ':interest_amount': Number(appInterestCharges),
+            ':storage_fee': 0,
+            ':total_amount_due': Number(appAmountDisbursed) + Number(appInterestCharges),
+            ':amount_paid': 0,
+            ':balance_remaining': Number(appAmountDisbursed) + Number(appInterestCharges),
+            ':term_days': appTermDays,
+            ':issue_date': appDateReceived,
+            ':due_date': appDueDate,
+            ':grace_period_days': 7,
+            ':maturity_date': calculatedMaturity,
+            ':funder': appFunder,
+            ':disbursement_method': 'Cash',
+            ':disbursement_reference': 'CSH-' + Math.floor(100000 + Math.random() * 900000),
+            ':status': 'ACTIVE',
+            ':staff_issuer': appFunder,
+            ':notes': appNotes.trim() || null,
+            ':created_at': nowStr,
+            ':updated_at': nowStr
+          }
+        );
+
+        // Record Initial Loan Issue Transaction in Immutable Ledger
+        const txnId = 'txn-' + Date.now();
+        const txnCode = sqliteService.getNextSequence('TXN');
+        const rctCode = sqliteService.getNextSequence('RCT');
+        sqliteService.run(
+          `INSERT INTO ledger_transactions (
+            id, transaction_number, receipt_number, loan_id, collateral_id, customer_id,
+            branch_id, transaction_type, amount, principal_portion, interest_portion,
+            balance_after, payment_method, received_by, notes, transaction_date, created_at
+          ) VALUES (
+            :id, :txn, :rct, :lid, :cid, :cuid, :bid, 'LOAN_ISSUED', :amt, :amt, 0,
+            :bal, 'Cash', :rec, :notes, :tdate, :ca
+          )`,
+          {
+            ':id': txnId,
+            ':txn': txnCode,
+            ':rct': rctCode,
+            ':lid': loanId,
+            ':cid': colId,
+            ':cuid': custId,
+            ':bid': 'br-nairobi',
+            ':amt': Number(appAmountDisbursed),
+            ':bal': Number(appAmountDisbursed) + Number(appInterestCharges),
+            ':rec': appFunder,
+            ':notes': `Loan issued by ${appFunder} for ${itemFullName}. 30% 2-week interest applied.`,
+            ':tdate': appDateReceived,
+            ':ca': nowStr
           }
         );
 
@@ -378,7 +559,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
           {
             ':id': 'itm-' + Date.now(),
             ':iid': invId,
-            ':desc': `Cash Advance Disbursed by Director ${appFunder}`,
+            ':desc': `Cash Advance Disbursed by Director ${appFunder} (30% interest)`,
             ':pr': Number(appAmountDisbursed)
           }
         );
@@ -388,7 +569,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
           'CREATE_CUSTOMER_WITH_APPLIANCE',
           'CUSTOMER',
           custId,
-          `Registered customer ${name} and collateral ${appCode} (${appBrand} ${appModel}) funded by ${appFunder} KES ${appAmountDisbursed} due on ${appDueDate}`
+          `Registered customer ${name} (${custCode}) with collateral ${colCode} and Rehani loan ${loanCode} funded by ${appFunder} KES ${appAmountDisbursed} (30% interest: KES ${appInterestCharges}) due on ${appDueDate}`
         );
       } else {
         sqliteService.logAudit(
@@ -396,7 +577,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
           'CREATE_CUSTOMER',
           'CUSTOMER',
           custId,
-          `Registered customer: ${name} (${idNumber}) with phone: ${phone}`
+          `Registered permanent customer: ${name} (${custCode}, ID: ${idNumber}) with phone: ${phone}`
         );
       }
 
@@ -407,8 +588,10 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
       setName('');
       setIdNumber('');
       setPhone('+254 ');
+      setAltPhone('N/A');
       setEmail('');
       setAddress('');
+      setCounty('Nairobi');
       setNotes('');
       setNewCustomerPhoto('');
       setAppBrand('');
@@ -416,11 +599,21 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
       setAppSerialNumber('');
       setAppPhotos([]);
       setAppNotes('');
+      setAppTermDays(14);
+      setAppAmountDisbursed(10000);
+      setAppInterestCharges(3000);
 
       alert(
         includeAppliance
-          ? `Customer ${name} & Collateral ${createdApplianceCode} successfully saved! Cash disbursed by ${appFunder}. Due Date set to ${appDueDate}.`
-          : `Customer ${name} profile registered successfully!`
+          ? `Customer ${name} & Collateral successfully registered!\n` +
+            `• Loan Number: ${createdLoanCode}\n` +
+            `• Collateral ID: ${createdApplianceCode}\n` +
+            `• Principal: KES ${formatKES(appAmountDisbursed)}\n` +
+            `• 30% Interest (2 Weeks): KES ${formatKES(appInterestCharges)}\n` +
+            `• Total Due to Redeem: KES ${formatKES(Number(appAmountDisbursed) + Number(appInterestCharges))}\n` +
+            `• Due Date: ${appDueDate} (Strict 14-day cycle maximum)\n` +
+            `• Disbursed by: ${appFunder}`
+          : `Customer ${name} permanent profile registered successfully!`
       );
     } catch (err: any) {
       alert('Error during registration: ' + err.message);
@@ -901,19 +1094,19 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
                   </div>
                 </div>
 
-                <div>
-                  <label className="block font-bold text-slate-300 mb-1">Customer Full Name *</label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Samuel Kimani Wachira"
-                    className="w-full py-2.5 px-3 glass-input rounded-xl text-white text-xs focus:outline-none focus:border-[#0ABAB5]"
-                    required
-                  />
-                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-300 mb-1">Customer Full Name *</label>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="e.g. Samuel Kimani Wachira"
+                      className="w-full py-2.5 px-3 glass-input rounded-xl text-white text-xs focus:outline-none focus:border-[#0ABAB5]"
+                      required
+                    />
+                  </div>
 
-                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block font-bold text-slate-300 mb-1">National ID / Passport No *</label>
                     <input
@@ -925,7 +1118,9 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
                       required
                     />
                   </div>
+                </div>
 
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block font-bold text-slate-300 mb-1">Customer Phone / Tel No *</label>
                     <input
@@ -935,6 +1130,26 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
                       placeholder="e.g. 0727108749 or 0180366344"
                       className="w-full py-2.5 px-3 glass-input rounded-xl text-white font-mono text-xs focus:outline-none focus:border-[#0ABAB5]"
                       required
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block font-bold text-slate-300">Alternative Phone</label>
+                      <button
+                        type="button"
+                        onClick={() => setAltPhone(altPhone === 'N/A' ? '+254 ' : 'N/A')}
+                        className="text-[10px] text-[#0ABAB5] hover:underline font-mono cursor-pointer"
+                      >
+                        {altPhone === 'N/A' ? '+ Enter Number' : 'Set as N/A'}
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={altPhone}
+                      onChange={(e) => setAltPhone(e.target.value)}
+                      placeholder="e.g. 0712345678 or N/A"
+                      className="w-full py-2.5 px-3 glass-input rounded-xl text-white font-mono text-xs focus:outline-none focus:border-[#0ABAB5]"
                     />
                   </div>
                 </div>
@@ -952,15 +1167,33 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-300 mb-1">Email Address (Optional)</label>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="client@example.com"
-                      className="w-full py-2.5 px-3 glass-input rounded-xl text-white text-xs focus:outline-none focus:border-[#0ABAB5]"
-                    />
+                    <label className="block font-bold text-slate-300 mb-1">County</label>
+                    <select
+                      value={county}
+                      onChange={(e) => setCounty(e.target.value)}
+                      className="w-full py-2.5 px-3 glass-input rounded-xl text-white text-xs focus:outline-none focus:border-[#0ABAB5] cursor-pointer"
+                    >
+                      <option value="Nairobi" className="bg-slate-900">Nairobi</option>
+                      <option value="Kiambu" className="bg-slate-900">Kiambu</option>
+                      <option value="Mombasa" className="bg-slate-900">Mombasa</option>
+                      <option value="Nakuru" className="bg-slate-900">Nakuru</option>
+                      <option value="Eldoret / Uasin Gishu" className="bg-slate-900">Eldoret / Uasin Gishu</option>
+                      <option value="Machakos" className="bg-slate-900">Machakos</option>
+                      <option value="Kajiado" className="bg-slate-900">Kajiado</option>
+                      <option value="Other County" className="bg-slate-900">Other County</option>
+                    </select>
                   </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-300 mb-1">Email Address (Optional)</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="client@example.com"
+                    className="w-full py-2.5 px-3 glass-input rounded-xl text-white text-xs focus:outline-none focus:border-[#0ABAB5]"
+                  />
                 </div>
               </div>
 
@@ -1047,7 +1280,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
                         </select>
                       </div>
 
-                      {appCategory === 'Other appliances' ? (
+                      {((appCategory as string) === 'Other appliances' || (appCategory as string) === 'Other Collateral') ? (
                         <div>
                           <label className="block font-bold text-slate-300 mb-1">Specify Other Appliance *</label>
                           <input
@@ -1074,7 +1307,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
                       )}
                     </div>
 
-                    {appCategory === 'Other appliances' && (
+                    {((appCategory as string) === 'Other appliances' || (appCategory as string) === 'Other Collateral') && (
                       <div>
                         <label className="block font-bold text-slate-300 mb-1">Brand Name *</label>
                         <input
@@ -1114,77 +1347,150 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
                       </div>
                     </div>
 
-                    {/* Financials: Valuation & Money Disbursed */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-black/40 border border-white/10 rounded-xl">
-                      <div>
-                        <label className="block font-bold text-slate-300 mb-1">Market Valuation (KES) *</label>
-                        <input
-                          type="number"
-                          value={appMarketValue}
-                          onChange={(e) => setAppMarketValue(Number(e.target.value))}
-                          className="w-full py-2.5 px-3 glass-input rounded-xl text-white font-mono text-xs focus:outline-none focus:border-[#0ABAB5]"
-                          required
-                        />
+                    {/* Financials: Valuation, Disbursed Loan & 30% Interest Fee */}
+                    <div className="p-3.5 bg-black/40 border border-white/10 rounded-2xl space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block font-bold text-slate-300 mb-1">Market Valuation (KES) *</label>
+                          <input
+                            type="number"
+                            value={appMarketValue}
+                            onChange={(e) => setAppMarketValue(Number(e.target.value))}
+                            className="w-full py-2.5 px-3 glass-input rounded-xl text-white font-mono text-xs focus:outline-none focus:border-[#0ABAB5]"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block font-bold text-[#0ABAB5] mb-1">
+                            Money Given Out by {appFunder} (KES) *
+                          </label>
+                          <input
+                            type="number"
+                            value={appAmountDisbursed}
+                            onChange={(e) => handleAmountDisbursedChange(Number(e.target.value))}
+                            className="w-full py-2.5 px-3 glass-input rounded-xl text-[#0ABAB5] font-bold font-mono text-sm focus:outline-none focus:border-[#0ABAB5]"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="font-bold text-amber-400">
+                              Interest (30% per 2 Wks) *
+                            </label>
+                            <span className="text-[10px] text-amber-400 font-mono font-bold">30% Fixed</span>
+                          </div>
+                          <input
+                            type="number"
+                            value={appInterestCharges}
+                            onChange={(e) => setAppInterestCharges(Number(e.target.value))}
+                            className="w-full py-2.5 px-3 glass-input rounded-xl text-amber-400 font-mono font-bold text-xs focus:outline-none focus:border-amber-400"
+                            required
+                          />
+                        </div>
                       </div>
 
-                      <div>
-                        <label className="block font-bold text-[#0ABAB5] mb-1">
-                          Money Given Out by {appFunder} (KES) *
-                        </label>
-                        <input
-                          type="number"
-                          value={appAmountDisbursed}
-                          onChange={(e) => setAppAmountDisbursed(Number(e.target.value))}
-                          className="w-full py-2.5 px-3 glass-input rounded-xl text-[#0ABAB5] font-bold font-mono text-sm focus:outline-none focus:border-[#0ABAB5]"
-                          required
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block font-bold text-slate-300 mb-1">Storage / Interest Fee (KES)</label>
-                        <input
-                          type="number"
-                          value={appInterestCharges}
-                          onChange={(e) => setAppInterestCharges(Number(e.target.value))}
-                          className="w-full py-2.5 px-3 glass-input rounded-xl text-white font-mono text-xs focus:outline-none focus:border-[#0ABAB5]"
-                        />
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-white/10">
+                        <span>Standard Rate: <strong>30% per two-week cycle</strong></span>
+                        <button
+                          type="button"
+                          onClick={() => setAppInterestCharges(Math.round(appAmountDisbursed * 0.3))}
+                          className="text-[#0ABAB5] hover:underline font-mono text-[10px] cursor-pointer"
+                        >
+                          ⚡ Auto-Recalculate 30% (KES {formatKES(Math.round(appAmountDisbursed * 0.3))})
+                        </button>
                       </div>
                     </div>
 
-                    {/* Date Received & Strictly 2-Week Due Date */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-black/40 border border-[#0ABAB5]/30 rounded-xl">
-                      <div>
-                        <label className="block font-bold text-slate-300 mb-1 flex items-center gap-1">
-                          <Calendar className="w-3.5 h-3.5 text-[#0ABAB5]" />
-                          <span>Date Received</span>
-                        </label>
-                        <input
-                          type="date"
-                          value={appDateReceived}
-                          onChange={(e) => handleDateReceivedChange(e.target.value)}
-                          className="w-full py-2.5 px-3 glass-input rounded-xl text-white font-mono text-xs focus:outline-none focus:border-[#0ABAB5]"
-                          required
-                        />
+                    {/* Date Received & Strictly Maximum 2-Week Due Date */}
+                    <div className="p-3.5 bg-black/40 border border-[#0ABAB5]/40 rounded-2xl space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-white text-xs flex items-center gap-1.5">
+                          <Clock className="w-4 h-4 text-[#0ABAB5]" />
+                          <span>Collateral Term: Maximum 2 Weeks (14 Days)</span>
+                        </span>
+                        <span className="text-[10px] bg-rose-950/60 text-rose-300 border border-rose-800/40 px-2.5 py-0.5 rounded-full font-bold">
+                          Maximum 14 Days
+                        </span>
                       </div>
 
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="font-bold text-rose-400 flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5 text-rose-400" />
-                            <span>Due Date (Strict 2-Week Cycle) *</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block font-bold text-slate-300 mb-1 flex items-center gap-1">
+                            <Calendar className="w-3.5 h-3.5 text-[#0ABAB5]" />
+                            <span>Date Received</span>
                           </label>
-                          <span className="text-[10px] text-[#0ABAB5] font-mono font-bold">14 Days Auto</span>
+                          <input
+                            type="date"
+                            value={appDateReceived}
+                            onChange={(e) => handleDateReceivedChange(e.target.value)}
+                            className="w-full py-2.5 px-3 glass-input rounded-xl text-white font-mono text-xs focus:outline-none focus:border-[#0ABAB5]"
+                            required
+                          />
                         </div>
-                        <input
-                          type="date"
-                          value={appDueDate}
-                          onChange={(e) => setAppDueDate(e.target.value)}
-                          className="w-full py-2.5 px-3 glass-input rounded-xl text-rose-400 font-bold font-mono text-xs focus:outline-none focus:border-rose-400"
-                          required
-                        />
-                        <span className="text-[10px] text-slate-400 mt-1 block">
-                          Appliance must be redeemed or extended by {appDueDate}.
-                        </span>
+
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="font-bold text-rose-400 flex items-center gap-1">
+                              <Clock className="w-3.5 h-3.5 text-rose-400" />
+                              <span>Due Date (Max 14 Days) *</span>
+                            </label>
+                            <span className="text-[10px] text-[#0ABAB5] font-mono font-bold">{appTermDays} Days</span>
+                          </div>
+                          <input
+                            type="date"
+                            min={appDateReceived}
+                            max={calculateLoanDueDate(appDateReceived, 14)}
+                            value={appDueDate}
+                            onChange={(e) => handleDueDateChange(e.target.value)}
+                            className="w-full py-2.5 px-3 glass-input rounded-xl text-rose-400 font-bold font-mono text-xs focus:outline-none focus:border-rose-400"
+                            required
+                          />
+                          <div className="flex items-center gap-2 mt-2">
+                            <span className="text-[10px] text-slate-400">Quick Term:</span>
+                            <button
+                              type="button"
+                              onClick={() => handleTermDaysSelect(7)}
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer border ${
+                                appTermDays === 7
+                                  ? 'bg-[#0ABAB5] text-black border-[#0ABAB5]'
+                                  : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
+                              }`}
+                            >
+                              1 Week (7 Days)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleTermDaysSelect(14)}
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer border ${
+                                appTermDays === 14
+                                  ? 'bg-rose-500 text-white border-rose-400 font-extrabold'
+                                  : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
+                              }`}
+                            >
+                              2 Weeks (14 Days - Max)
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Real-Time Repayment Calculation Summary */}
+                      <div className="p-3 bg-black/60 rounded-xl border border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs">
+                        <div>
+                          <div className="text-[10px] text-slate-400 uppercase font-semibold">Principal Disbursed:</div>
+                          <div className="text-white font-mono font-bold text-sm">{formatKES(appAmountDisbursed)}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-[10px] text-amber-400 uppercase font-semibold">+ 30% Interest (2 Wks):</div>
+                          <div className="text-amber-400 font-mono font-bold text-sm">+{formatKES(appInterestCharges)}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-[10px] text-[#0ABAB5] uppercase font-semibold">Total Due to Redeem:</div>
+                          <div className="text-[#0ABAB5] font-mono-numbers font-black text-base">
+                            {formatKES(Number(appAmountDisbursed) + Number(appInterestCharges))}
+                          </div>
+                        </div>
                       </div>
                     </div>
 

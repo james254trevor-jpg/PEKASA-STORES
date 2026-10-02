@@ -5,6 +5,10 @@ import { Navbar } from './components/Navbar';
 import { LoginModal } from './components/LoginModal';
 import { DashboardView } from './components/DashboardView';
 import { PartnerPersonalPortal } from './components/PartnerPersonalPortal';
+import { LoansView } from './components/LoansView';
+import { CollateralView } from './components/CollateralView';
+import { SalesView } from './components/SalesView';
+import { TreasuryExpensesView } from './components/TreasuryExpensesView';
 import { AppliancesView } from './components/AppliancesView';
 import { CustomersView } from './components/CustomersView';
 import { PaymentsView } from './components/PaymentsView';
@@ -12,6 +16,7 @@ import { InventoryPartsView } from './components/InventoryPartsView';
 import { PartnersView } from './components/PartnersView';
 import { BackupRestoreModal } from './components/BackupRestoreModal';
 import { ThemeSettingsPanel } from './components/ThemeSettingsPanel';
+import { AddCustomerWithItemsModal } from './components/AddCustomerWithItemsModal';
 import { Appliance, STORE_NAME, STORE_MOTTO } from './types';
 import { Database, HardDrive, Shield, Sun, Moon, Palette } from 'lucide-react';
 
@@ -19,12 +24,17 @@ const MainApp: React.FC = () => {
   const { currentUser, isLoading } = useAuth();
   const { themeMode, toggleThemeMode, openThemePanel, currentAccent } = useTheme();
 
+  // Selected branch filter across the store
+  const [selectedBranchId, setSelectedBranchId] = useState<string>('ALL');
+
   // Each partner lands directly on their personal desk upon sign in
   const [activeTab, setActiveTab] = useState<string>('portal');
   const [isBackupOpen, setIsBackupOpen] = useState(false);
+  const [isAddCustomerWithItemsOpen, setIsAddCustomerWithItemsOpen] = useState(false);
 
   // Cross-view state links
-  const [selectedApplianceId, setSelectedApplianceId] = useState<string | null>(null);
+  const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null);
+  const [selectedCollateralId, setSelectedCollateralId] = useState<string | null>(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [applianceSearchQuery, setApplianceSearchQuery] = useState<string>('');
   const [customerSearchQuery, setCustomerSearchQuery] = useState<string>('');
@@ -49,8 +59,8 @@ const MainApp: React.FC = () => {
   }
 
   const handleSelectApplianceFromOther = (applianceId: string) => {
-    setSelectedApplianceId(applianceId);
-    setActiveTab('appliances');
+    setSelectedCollateralId(applianceId);
+    setActiveTab('collateral');
   };
 
   const handleSelectCustomerFromOther = (customerId: string) => {
@@ -59,9 +69,9 @@ const MainApp: React.FC = () => {
   };
 
   const handleSearchInTab = (tab: string, query: string) => {
-    if (tab === 'appliances') {
+    if (tab === 'collateral' || tab === 'appliances') {
       setApplianceSearchQuery(query);
-      setActiveTab('appliances');
+      setActiveTab('collateral');
     } else if (tab === 'customers') {
       setCustomerSearchQuery(query);
       setActiveTab('customers');
@@ -85,6 +95,7 @@ const MainApp: React.FC = () => {
         onSelectAppliance={handleSelectApplianceFromOther}
         onSelectCustomer={handleSelectCustomerFromOther}
         onSearchInTab={handleSearchInTab}
+        onOpenAddCustomerWithItems={() => setIsAddCustomerWithItemsOpen(true)}
       />
 
       {/* Main View Area */}
@@ -95,9 +106,8 @@ const MainApp: React.FC = () => {
             user={currentUser}
             onNavigateToDashboard={() => setActiveTab('dashboard')}
             onOpenNewAppliance={() => {
-              setSelectedApplianceId(null);
-              setApplianceSearchQuery('');
-              setActiveTab('appliances');
+              setSelectedCollateralId(null);
+              setActiveTab('collateral');
             }}
             onOpenNewPayment={() => {
               setApplianceForPayment(null);
@@ -108,54 +118,87 @@ const MainApp: React.FC = () => {
           />
         )}
 
-        {/* Global Shop Dashboard */}
+        {/* Global Shop Command Center / Rehani Dashboard */}
         {activeTab === 'dashboard' && (
           <DashboardView
-            onSelectAppliance={handleSelectApplianceFromOther}
-            onSelectCustomer={handleSelectCustomerFromOther}
-            onOpenNewAppliance={() => {
-              setSelectedApplianceId(null);
-              setActiveTab('appliances');
+            selectedBranchId={selectedBranchId}
+            onBranchChange={(bId) => setSelectedBranchId(bId)}
+            onNavigate={(tab) => setActiveTab(tab)}
+            onOpenNewLoan={() => {
+              setSelectedLoanId(null);
+              setActiveTab('loans');
+            }}
+            onOpenNewCollateral={() => {
+              setSelectedCollateralId(null);
+              setActiveTab('collateral');
             }}
             onOpenNewPayment={() => {
-              setApplianceForPayment(null);
               setActiveTab('payments');
             }}
-            onOpenNewCustomer={() => {
-              setSelectedCustomerId(null);
+            onOpenAddCustomerWithItems={() => setIsAddCustomerWithItemsOpen(true)}
+            onSelectLoan={(loanId) => {
+              setSelectedLoanId(loanId);
+              setActiveTab('loans');
+            }}
+            onSelectCustomer={(custId) => {
+              setSelectedCustomerId(custId);
               setActiveTab('customers');
             }}
-            onOpenPersonalPortal={() => {
-              setActiveTab('portal');
+          />
+        )}
+
+        {/* Rehani Loans View (Pawn Tickets, LTV Limits, Grace Period & Renewals) */}
+        {activeTab === 'loans' && (
+          <LoansView
+            selectedBranchId={selectedBranchId}
+            initialSelectedLoanId={selectedLoanId}
+            onSelectCustomer={(custId) => {
+              setSelectedCustomerId(custId);
+              setActiveTab('customers');
             }}
+            onSelectCollateral={(colId) => {
+              setSelectedCollateralId(colId);
+              setActiveTab('collateral');
+            }}
+            onOpenAddCustomerWithItems={() => setIsAddCustomerWithItemsOpen(true)}
           />
         )}
 
-        {/* Appliances View */}
-        {activeTab === 'appliances' && (
-          <AppliancesView
-            selectedApplianceId={selectedApplianceId}
-            initialSearchQuery={applianceSearchQuery}
-            onClearSelectedAppliance={() => setSelectedApplianceId(null)}
-            onOpenPaymentForAppliance={handleOpenPaymentForAppliance}
+        {/* Collateral Vault (Physical items, TV/Laptop Specs, Storage Rack/Shelf, IMEI Check) */}
+        {(activeTab === 'collateral' || activeTab === 'appliances') && (
+          <CollateralView
+            selectedBranchId={selectedBranchId}
+            initialSelectedCollateralId={selectedCollateralId}
+            onSelectCustomer={(custId) => {
+              setSelectedCustomerId(custId);
+              setActiveTab('customers');
+            }}
+            onOpenNewLoanForCollateral={(colId) => {
+              setSelectedCollateralId(colId);
+              setActiveTab('loans');
+            }}
+            onOpenAddCustomerWithItems={() => setIsAddCustomerWithItemsOpen(true)}
           />
         )}
 
-        {/* Customers View */}
+        {/* Customers View (Permanent CUS profiles, credit metrics, full history) */}
         {activeTab === 'customers' && (
           <CustomersView
             selectedCustomerId={selectedCustomerId}
             initialSearchQuery={customerSearchQuery}
             onClearSelectedCustomer={() => setSelectedCustomerId(null)}
-            onSelectAppliance={handleSelectApplianceFromOther}
-            onOpenNewApplianceForCustomer={(custId) => {
-              setSelectedApplianceId(null);
-              setActiveTab('appliances');
+            onSelectAppliance={(colId) => {
+              setSelectedCollateralId(colId);
+              setActiveTab('collateral');
+            }}
+            onOpenNewApplianceForCustomer={(_custId) => {
+              setSelectedCollateralId(null);
+              setActiveTab('collateral');
             }}
           />
         )}
 
-        {/* Payments View */}
+        {/* Ledger & Payments (Immutable ledger, thermal receipts, M-Pesa tracking) */}
         {activeTab === 'payments' && (
           <PaymentsView
             initialApplianceForPayment={applianceForPayment}
@@ -163,8 +206,20 @@ const MainApp: React.FC = () => {
           />
         )}
 
+        {/* Collateral Sales (Statutory disposition workflow, buyer records, profit/loss) */}
+        {activeTab === 'sales' && (
+          <SalesView selectedBranchId={selectedBranchId} />
+        )}
+
+        {/* Treasury & Operating Expenses (Cash in vault, Till, Rent, Tokens, Net Profit) */}
+        {activeTab === 'treasury' && (
+          <TreasuryExpensesView selectedBranchId={selectedBranchId} />
+        )}
+
+        {/* Parts & Stock Inventory */}
         {activeTab === 'inventory' && <InventoryPartsView />}
 
+        {/* Admin, Staff Roles & System Reports */}
         {activeTab === 'partners' && <PartnersView />}
       </main>
 
@@ -248,6 +303,18 @@ const MainApp: React.FC = () => {
       <BackupRestoreModal
         isOpen={isBackupOpen}
         onClose={() => setIsBackupOpen(false)}
+      />
+
+      {/* Unified Add Customer & Collateral Modal (Strict 2-Week & 30% Interest) */}
+      <AddCustomerWithItemsModal
+        isOpen={isAddCustomerWithItemsOpen}
+        onClose={() => setIsAddCustomerWithItemsOpen(false)}
+        defaultBranchId={selectedBranchId}
+        onSuccess={(custId, loanId, colId) => {
+          setSelectedCustomerId(custId);
+          setSelectedLoanId(loanId);
+          setSelectedCollateralId(colId);
+        }}
       />
 
       {/* Theme Colour Setting Panel */}

@@ -27,6 +27,7 @@ interface PartnerPersonalPortalProps {
   onOpenNewAppliance: () => void;
   onOpenNewPayment: () => void;
   onSelectAppliance: (applianceId: string) => void;
+  onSelectCustomer?: (customerId: string) => void;
 }
 
 export const PartnerPersonalPortal: React.FC<PartnerPersonalPortalProps> = ({
@@ -34,7 +35,8 @@ export const PartnerPersonalPortal: React.FC<PartnerPersonalPortalProps> = ({
   onNavigateToDashboard,
   onOpenNewAppliance,
   onOpenNewPayment,
-  onSelectAppliance
+  onSelectAppliance,
+  onSelectCustomer
 }) => {
   const isTrevor = user.username.toLowerCase() === 'trevor';
   const partnerName = isTrevor ? 'Trevor' : 'Peter';

@@ -31,6 +31,7 @@ interface NavbarProps {
   onSelectAppliance: (applianceId: string) => void;
   onSelectCustomer: (customerId: string) => void;
   onSearchInTab: (tab: string, query: string) => void;
+  onOpenAddCustomerWithItems?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -39,7 +40,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenBackup,
   onSelectAppliance,
   onSelectCustomer,
-  onSearchInTab
+  onSearchInTab,
+  onOpenAddCustomerWithItems
 }) => {
   const { currentUser, currentRole, users, switchUserWithPassword, logout } = useAuth();
   const { themeMode, toggleThemeMode, openThemePanel, currentAccent } = useTheme();
@@ -57,11 +59,13 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const navLinks = [
     { id: 'portal', label: partnerDeskTitle, isPersonal: true },
-    { id: 'dashboard', label: 'Store Dashboard' },
-    { id: 'appliances', label: 'Appliances' },
+    { id: 'dashboard', label: 'Command Center' },
+    { id: 'loans', label: 'Rehani Loans' },
+    { id: 'collateral', label: 'Collateral Vault' },
     { id: 'customers', label: 'Customers' },
-    { id: 'payments', label: 'Payments' },
-    { id: 'inventory', label: 'Parts & Stock' },
+    { id: 'payments', label: 'Ledger' },
+    { id: 'sales', label: 'Collateral Sales' },
+    { id: 'treasury', label: 'Treasury & Expenses' },
     { id: 'partners', label: 'Admin & Reports' }
   ];
 
@@ -157,6 +161,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Zone 3: Primary actions & User Duty Switcher with Password Prompt */}
         <div className="flex items-center gap-2 shrink-0">
+          {onOpenAddCustomerWithItems && (
+            <button
+              onClick={onOpenAddCustomerWithItems}
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs font-black text-black bg-[#0ABAB5] hover:bg-[#1FD2CD] rounded-xl transition-all shadow-md shadow-[#0ABAB5]/20 cursor-pointer"
+              title="Add Customer Details & Intake Collateral in One Unified Screen"
+            >
+              <span>+ Customer & Item</span>
+            </button>
+          )}
+
           {/* Theme Mode Quick Switcher (Tiffany Dark <-> Professional Light) */}
           <button
             onClick={toggleThemeMode}

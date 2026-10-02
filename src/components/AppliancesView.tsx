@@ -186,7 +186,7 @@ export const AppliancesView: React.FC<AppliancesViewProps> = ({
         ':appliance_number': newCode,
         ':customer_id': newCustomerId,
         ':category': newCategory,
-        ':custom_category': newCategory === 'Other appliances' ? newCustomCategory : null,
+        ':custom_category': ((newCategory as string) === 'Other appliances' || (newCategory as string) === 'Other Collateral') ? newCustomCategory : null,
         ':brand': newBrand,
         ':model': newModel,
         ':serial_number': newSerialNumber,
@@ -599,8 +599,8 @@ export const AppliancesView: React.FC<AppliancesViewProps> = ({
                       const msg = createRepairReadyMessage({
                         customerName: detailCustomer.name,
                         applianceCode: detailAppliance.appliance_number,
-                        applianceItem: `${detailAppliance.brand} ${detailAppliance.category}`,
-                        repairCost: sqliteService.calculateApplianceBalance(detailAppliance).balanceRemaining
+                        applianceDescription: `${detailAppliance.brand} ${detailAppliance.category}`,
+                        balanceDue: sqliteService.calculateApplianceBalance(detailAppliance).balanceRemaining
                       });
                       const link = generateWhatsAppLink(detailCustomer.phone, msg);
                       window.open(link, '_blank');
@@ -928,7 +928,7 @@ export const AppliancesView: React.FC<AppliancesViewProps> = ({
                   </select>
                 </div>
 
-                {newCategory === 'Other appliances' && (
+                {((newCategory as string) === 'Other appliances' || (newCategory as string) === 'Other Collateral') && (
                   <div>
                     <label className="block font-bold text-slate-300 mb-1">Specify Other Appliance</label>
                     <input

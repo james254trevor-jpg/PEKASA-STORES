@@ -1,6 +1,6 @@
 {
-  "name": "PEKASA - Appliance & Shop Management",
-  "description": "Enterprise shop and appliance management system with SQLite relational storage, M-Pesa tracking, photo management, automatic invoicing, and multi-user roles.",
+  "name": "PEKASA STORES - Rehani & Pawn Management System",
+  "description": "PEKASA STORES: Complete Rehani and Pawn Management System with WebAssembly SQLite, physical collateral vault tracking, pawn tickets, automatic item valuation, immutable ledger, and statutory disposition workflow.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

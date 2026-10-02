@@ -44,7 +44,7 @@ export const InventoryPartsView: React.FC = () => {
   const [reorderLevel, setReorderLevel] = useState<number>(3);
 
   // Stock Movement Form State
-  const [movementType, setMovementType] = useState<'IN' | 'OUT' | 'ADJUST'>('IN');
+  const [movementType, setMovementType] = useState<'IN' | 'OUT' | 'ADJUSTMENT'>('IN');
   const [moveQuantity, setMoveQuantity] = useState<number>(5);
   const [moveReason, setMoveReason] = useState('Bulk shipment received');
 
@@ -53,7 +53,7 @@ export const InventoryPartsView: React.FC = () => {
     const q = searchQuery.toLowerCase();
     const matchesSearch =
       p.sku.toLowerCase().includes(q) ||
-      p.part_name.toLowerCase().includes(q) ||
+      p.name.toLowerCase().includes(q) ||
       p.category.toLowerCase().includes(q);
 
     const matchesCat = categoryFilter === 'ALL' || p.category === categoryFilter;
@@ -481,7 +481,7 @@ export const InventoryPartsView: React.FC = () => {
               <div>
                 <h3 className="font-bold text-white text-sm">Stock Movement</h3>
                 <p className="text-[11px] text-amber-400 font-mono">
-                  {selectedPartForMovement.sku} · {selectedPartForMovement.part_name}
+                  {selectedPartForMovement.sku} · {selectedPartForMovement.name}
                 </p>
               </div>
               <button onClick={() => setIsStockMovementModalOpen(false)} className="text-slate-400 hover:text-white cursor-pointer">
@@ -493,7 +493,7 @@ export const InventoryPartsView: React.FC = () => {
               <div>
                 <label className="block font-bold text-slate-300 mb-1">Movement Type</label>
                 <div className="grid grid-cols-3 gap-2">
-                  {(['IN', 'OUT', 'ADJUST'] as const).map((t) => (
+                  {(['IN', 'OUT', 'ADJUSTMENT'] as const).map((t) => (
                     <button
                       type="button"
                       key={t}
@@ -512,7 +512,7 @@ export const InventoryPartsView: React.FC = () => {
 
               <div>
                 <label className="block font-bold text-slate-300 mb-1">
-                  {movementType === 'ADJUST' ? 'New Total Quantity' : 'Quantity to Add / Deduct'}
+                  {movementType === 'ADJUSTMENT' ? 'New Total Quantity' : 'Quantity to Add / Deduct'}
                 </label>
                 <input
                   type="number"
