@@ -28,8 +28,51 @@ export interface User {
   role_id: string;
   role_title: string;
   branch_id?: string;
+  is_active?: boolean;
   created_at: string;
   last_login: string | null;
+}
+
+export type RoleType = 'ADMIN' | 'CASHIER';
+
+export interface CashierSession {
+  id: string;
+  cashier_id: string;
+  cashier_name: string;
+  branch_id: string;
+  session_date: string;
+  opened_at: string;
+  closed_at?: string | null;
+  opening_cash: number;
+  cash_collected: number;
+  mpesa_collected: number;
+  other_collected: number;
+  expected_cash: number;
+  actual_cash?: number | null;
+  difference?: number | null;
+  status: 'OPEN' | 'CLOSED';
+  reconciliation_status: 'PENDING_APPROVAL' | 'APPROVED' | 'DISCREPANCY_FLAGGED';
+  reconciliation_approved_by?: string | null;
+  reconciliation_notes?: string | null;
+  notes?: string | null;
+}
+
+export interface PaymentVoidRequest {
+  id: string;
+  request_number: string;
+  payment_id: string;
+  receipt_number: string;
+  loan_number?: string;
+  customer_name: string;
+  amount: number;
+  cashier_id: string;
+  cashier_name: string;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  admin_notes?: string | null;
+  created_at: string;
 }
 
 export const STORE_NAME = 'PEKASA STORES';

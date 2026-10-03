@@ -20,10 +20,11 @@ import { AddCustomerWithItemsModal } from './components/AddCustomerWithItemsModa
 import { PublicHomePage } from './components/PublicHomePage';
 import LoginPage1 from '@/components/ui/login-page-1';
 import { Appliance, STORE_NAME, STORE_MOTTO } from './types';
-import { Database, HardDrive, Shield, Sun, Moon, Palette } from 'lucide-react';
+import { CashierDashboard } from './components/CashierDashboard';
+import { Database, HardDrive, Shield, Sun, Moon, Palette, AlertTriangle } from 'lucide-react';
 
 const MainApp: React.FC = () => {
-  const { currentUser, isLoading, login, loginError } = useAuth();
+  const { currentUser, isLoading, login, loginError, isAdmin, isCashier } = useAuth();
   const { themeMode, toggleThemeMode, openThemePanel, currentAccent } = useTheme();
 
   // View mode: 'home' (public storefront homepage) | 'portal' (internal Rehani management) | 'login' (shadcn LoginPage1)
@@ -32,10 +33,17 @@ const MainApp: React.FC = () => {
   // Selected branch filter across the store
   const [selectedBranchId, setSelectedBranchId] = useState<string>('ALL');
 
-  // Each partner lands directly on their personal desk upon sign in
+  // Default tab depends on role: Cashier lands on cashier-desk, Admin lands on portal
   const [activeTab, setActiveTab] = useState<string>('portal');
   const [isBackupOpen, setIsBackupOpen] = useState(false);
   const [isAddCustomerWithItemsOpen, setIsAddCustomerWithItemsOpen] = useState(false);
+
+  // Sync tab with role on login
+  React.useEffect(() => {
+    if (isCashier && (activeTab === 'portal' || activeTab === 'dashboard')) {
+      setActiveTab('cashier-desk');
+    }
+  }, [isCashier]);
 
   // Cross-view state links
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null);
@@ -136,8 +144,17 @@ const MainApp: React.FC = () => {
 
       {/* Main View Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Cashier Dedicated Desk (Active when role is Cashier or tab is cashier-desk) */}
+        {(activeTab === 'cashier-desk' || (isCashier && (activeTab === 'portal' || activeTab === 'dashboard'))) && (
+          <CashierDashboard
+            selectedBranchId={selectedBranchId}
+            onNavigateTab={(tab) => setActiveTab(tab)}
+            onOpenIntake={() => setIsAddCustomerWithItemsOpen(true)}
+          />
+        )}
+
         {/* Personal Desk / Partner Portal (Landing page for Trevor & Peter) */}
-        {activeTab === 'portal' && (
+        {!isCashier && activeTab === 'portal' && (
           <PartnerPersonalPortal
             user={currentUser}
             onNavigateToDashboard={() => setActiveTab('dashboard')}
@@ -155,7 +172,7 @@ const MainApp: React.FC = () => {
         )}
 
         {/* Global Shop Command Center / Rehani Dashboard */}
-        {activeTab === 'dashboard' && (
+        {!isCashier && activeTab === 'dashboard' && (
           <DashboardView
             selectedBranchId={selectedBranchId}
             onBranchChange={(bId) => setSelectedBranchId(bId)}
@@ -242,21 +259,79 @@ const MainApp: React.FC = () => {
           />
         )}
 
-        {/* Collateral Sales (Statutory disposition workflow, buyer records, profit/loss) */}
+        {/* Collateral Sales (Statutory disposition workflow - Admin Exclusive) */}
         {activeTab === 'sales' && (
-          <SalesView selectedBranchId={selectedBranchId} />
+          isCashier ? (
+            <div className="p-8 bg-slate-900 border border-slate-800 rounded-2xl text-center space-y-4 max-w-lg mx-auto my-12">
+              <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 mx-auto">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <h3 className="font-bold text-white text-base">Senior Partner Authorization Required</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Collateral liquidation and default sale authorization is reserved exclusively for Directors
+                <strong> Trevor Mbugua</strong> and <strong>Peter Kamau</strong>.
+              </p>
+              <button
+                onClick={() => setActiveTab('cashier-desk')}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs cursor-pointer shadow-md"
+              >
+                Return to Cashier Counter Desk
+              </button>
+            </div>
+          ) : (
+            <SalesView selectedBranchId={selectedBranchId} />
+          )
         )}
 
-        {/* Treasury & Operating Expenses (Cash in vault, Till, Rent, Tokens, Net Profit) */}
+        {/* Treasury & Operating Expenses (Admin Exclusive) */}
         {activeTab === 'treasury' && (
-          <TreasuryExpensesView selectedBranchId={selectedBranchId} />
+          isCashier ? (
+            <div className="p-8 bg-slate-900 border border-slate-800 rounded-2xl text-center space-y-4 max-w-lg mx-auto my-12">
+              <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 mx-auto">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <h3 className="font-bold text-white text-base">Financials & Capital Vault Restricted</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Store treasury capital, partner drawings, bank balances, and P&L financial reports are protected and
+                accessible only to Senior Partners.
+              </p>
+              <button
+                onClick={() => setActiveTab('cashier-desk')}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs cursor-pointer shadow-md"
+              >
+                Return to Cashier Counter Desk
+              </button>
+            </div>
+          ) : (
+            <TreasuryExpensesView selectedBranchId={selectedBranchId} />
+          )
         )}
 
         {/* Parts & Stock Inventory */}
         {activeTab === 'inventory' && <InventoryPartsView />}
 
-        {/* Admin, Staff Roles & System Reports */}
-        {activeTab === 'partners' && <PartnersView />}
+        {/* Admin, Staff Roles & System Reports (Admin Exclusive) */}
+        {activeTab === 'partners' && (
+          isCashier ? (
+            <div className="p-8 bg-slate-900 border border-slate-800 rounded-2xl text-center space-y-4 max-w-lg mx-auto my-12">
+              <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 mx-auto">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <h3 className="font-bold text-white text-base">Administrator Hub Restricted</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Staff account provisioning, cashier permission matrix, and system audit logs require Senior Partner credentials.
+              </p>
+              <button
+                onClick={() => setActiveTab('cashier-desk')}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs cursor-pointer shadow-md"
+              >
+                Return to Cashier Counter Desk
+              </button>
+            </div>
+          ) : (
+            <PartnersView />
+          )
+        )}
       </main>
 
       {/* Footer with Glassmorphic styling & Theme controls */}

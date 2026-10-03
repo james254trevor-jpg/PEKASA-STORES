@@ -11,7 +11,7 @@
  * - EXP-2026-000001 (Operating Expense)
  */
 
-export type SequencePrefix = 'LN' | 'COL' | 'CUS' | 'RCT' | 'TXN' | 'RNW' | 'SAL' | 'EXP' | 'APP' | 'INV';
+export type SequencePrefix = 'LN' | 'COL' | 'CUS' | 'RCT' | 'TXN' | 'RNW' | 'SAL' | 'EXP' | 'APP' | 'INV' | 'VOD' | 'SES';
 
 export function formatSequenceCode(prefix: SequencePrefix, sequenceNumber: number, year: number = 2026): string {
   const padded = String(sequenceNumber).padStart(6, '0');

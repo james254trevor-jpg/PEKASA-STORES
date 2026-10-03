@@ -1,12 +1,12 @@
 "use client";
 
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { EyeIcon, EyeOffIcon } from "lucide-react";
-import { useState } from "react";
-import { Mail, Lock } from "lucide-react";
+import { EyeIcon, EyeOffIcon, Mail, Lock, ShieldCheck, KeyRound, ArrowLeft, Smartphone, CheckCircle2 } from "lucide-react";
+import { useAuth } from "@/src/context/AuthContext";
 
 const socialButtons = [
   {
@@ -52,222 +52,352 @@ export interface LoginPageProps {
   onLogin?: (identifier: string, password: string) => Promise<boolean>;
 }
 
-export function LoginPage3({ onSuccess, onNavigateRegister, onClose, errorMessage, onLogin }: LoginPageProps = {}) {
+export function LoginPage3({ onSuccess, onNavigateRegister, onClose, errorMessage: propError, onLogin }: LoginPageProps = {}) {
+  const { requestLogin, verifyCashierOtp, loginError } = useAuth();
+  
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // OTP Step State (for Cashiers)
+  const [step, setStep] = useState<"credentials" | "otp">("credentials");
+  const [tempToken, setTempToken] = useState("");
+  const [contactInfo, setContactInfo] = useState("");
+  const [dispatchedOtp, setDispatchedOtp] = useState("");
+  const [otpInput, setOtpInput] = useState("");
+
+  const handleSubmitCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
     if (!email.trim() || !password.trim()) return;
 
-    if (onLogin) {
-      setLoading(true);
-      try {
-        const ok = await onLogin(email.trim(), password.trim());
-        if (ok && onSuccess) {
+    setLoading(true);
+    try {
+      const res = await requestLogin(email.trim(), password.trim());
+      if (res.requireOtp) {
+        // Switch to OTP step for Cashier
+        setStep("otp");
+        setTempToken(res.tempToken || "");
+        setContactInfo(res.contactInfo || "");
+        setDispatchedOtp(res.demoOtp || "");
+      } else if (res.success) {
+        // Direct login for Admin
+        if (onSuccess) {
           onSuccess(email);
         }
-      } catch (err: any) {
-        setLocalError(err?.message || "Login failed");
-      } finally {
-        setLoading(false);
+      } else {
+        setLocalError(res.error || "Login failed. Please check credentials.");
       }
-    } else if (onSuccess) {
-      onSuccess(email);
+    } catch (err: any) {
+      setLocalError(err?.message || "Login failed");
+    } finally {
+      setLoading(false);
     }
   };
 
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLocalError(null);
+    if (!otpInput.trim() || !tempToken) return;
+
+    setLoading(true);
+    try {
+      const res = await verifyCashierOtp(tempToken, otpInput.trim());
+      if (res.success) {
+        if (onSuccess) {
+          onSuccess(email);
+        }
+      } else {
+        setLocalError(res.error || "Invalid OTP code. Please enter the code sent to your phone/email.");
+      }
+    } catch (err: any) {
+      setLocalError(err?.message || "OTP verification failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleQuickFill = (user: string, pass: string) => {
+    setEmail(user);
+    setPassword(pass);
+    setLocalError(null);
+  };
+
   return (
-    <section className="from-background to-muted/50 relative isolate flex min-h-dvh w-full items-center justify-center overflow-hidden bg-gradient-to-br">
-      <div className="relative z-10 container mx-auto flex min-h-dvh items-center justify-center px-4 py-12">
+    <section className="from-background to-muted/50 relative isolate flex min-h-dvh w-full items-center justify-center overflow-hidden bg-gradient-to-br py-8">
+      <div className="relative z-10 container mx-auto flex min-h-dvh items-center justify-center px-4 py-8">
         <Card className="relative w-full max-w-md ring-0 p-8 shadow-2xl bg-card border-border">
           {onClose && (
             <button
               onClick={onClose}
               type="button"
-              className="absolute top-4 right-4 text-muted-foreground hover:text-foreground text-sm font-semibold p-1.5 rounded-lg hover:bg-muted transition-colors"
+              className="absolute top-4 right-4 text-muted-foreground hover:text-foreground text-sm font-semibold p-1.5 rounded-lg hover:bg-muted transition-colors cursor-pointer"
               aria-label="Close"
             >
               ✕
             </button>
           )}
 
-          <div className="mb-8 flex flex-col items-center">
-            <div className="my-4 flex justify-center">
-              <div className="bg-secondary relative size-14 rounded-full border border-border flex items-center justify-center text-primary">
+          <div className="mb-6 flex flex-col items-center">
+            <div className="my-2 flex justify-center">
+              <div className="bg-[#0B2D4A] relative size-14 rounded-2xl border border-[#FFD700]/30 flex items-center justify-center text-[#FFD700] shadow-md shadow-[#0B2D4A]/30">
                 <div className="flex h-full items-center justify-center">
-                  <svg
-                    width="32"
-                    height="32"
-                    viewBox="0 0 32 32"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M26 24.75C26.4142 24.75 26.75 24.4142 26.75 24C26.75 23.5858 26.4142 23.25 26 23.25V24.75ZM26 23.25H11V24.75H26V23.25ZM8.75 21V15H7.25V21H8.75ZM11 23.25C9.75736 23.25 8.75 22.2426 8.75 21H7.25C7.25 23.0711 8.92893 24.75 11 24.75V23.25Z"
-                      fill="currentColor"
-                    />
-                    <path
-                      d="M1.5 3.25C1.08579 3.25 0.75 3.58579 0.75 4C0.75 4.41421 1.08579 4.75 1.5 4.75V3.25ZM1.5 4.75H6V3.25H1.5V4.75ZM7.25 6V21H8.75V6H7.25ZM6 4.75C6.69036 4.75 7.25 5.30964 7.25 6H8.75C8.75 4.48122 7.51878 3.25 6 3.25V4.75Z"
-                      fill="currentColor"
-                    />
-                    <path
-                      d="M22 21.75C22.4142 21.75 22.75 21.4142 22.75 21C22.75 20.5858 22.4142 20.25 22 20.25V21.75ZM22 20.25H11V21.75H22V20.25ZM8.75 18V12H7.25V18H8.75ZM11 20.25C9.75736 20.25 8.75 19.2426 8.75 18H7.25C7.25 20.0711 8.92893 21.75 11 21.75V20.25Z"
-                      fill="currentColor"
-                    />
-                    <path
-                      d="M27.2057 19.754C27.0654 20.1438 26.6357 20.346 26.246 20.2057C25.8562 20.0654 25.654 19.6357 25.7943 19.246L27.2057 19.754ZM30.0361 9.67744L29.3305 9.4234L29.3305 9.4234L30.0361 9.67744ZM25.7943 19.246L29.3305 9.4234L30.7418 9.93148L27.2057 19.754L25.7943 19.246ZM28.1543 7.75L8 7.75V6.25L28.1543 6.25V7.75ZM29.3305 9.4234C29.6237 8.60882 29.0201 7.75 28.1543 7.75V6.25C30.059 6.25 31.3869 8.13941 30.7418 9.93148L29.3305 9.4234Z"
-                      fill="currentColor"
-                    />
-                    <path
-                      d="M13.5 21.75C13.0858 21.75 12.75 21.4142 12.75 21C12.75 20.5858 13.0858 20.25 13.5 20.25V21.75ZM26.7111 19.009L27.4174 19.2613L27.4174 19.2613L26.7111 19.009ZM13.5 20.25H23.8858V21.75H13.5V20.25ZM26.0048 18.7568L27.7937 13.7477L29.2063 14.2523L27.4174 19.2613L26.0048 18.7568ZM23.8858 20.25C24.8367 20.25 25.6849 19.6522 26.0048 18.7568L27.4174 19.2613C26.8843 20.7537 25.4706 21.75 23.8858 21.75V20.25Z"
-                      fill="currentColor"
-                    />
-                    <path
-                      d="M21.1694 10.5806L14.5651 17.1849"
-                      stroke="currentColor"
-                    />
-                    <path
-                      d="M22.1694 14.5806L18.5632 18.1868"
-                      stroke="currentColor"
-                    />
-                    <circle cx="13.1" cy="26.1" r="1.7" stroke="currentColor" />
-                    <circle cx="22.1" cy="26.1" r="1.7" stroke="currentColor" />
-                  </svg>
+                  {step === 'otp' ? (
+                    <KeyRound className="w-7 h-7 text-[#FFD700] animate-bounce" />
+                  ) : (
+                    <ShieldCheck className="w-7 h-7 text-[#FFD700]" />
+                  )}
                 </div>
               </div>
             </div>
-            <h1 className="mb-2 text-center text-2xl font-bold tracking-tight text-foreground">
-              Welcome Back!
+            <h1 className="mb-1 text-center text-2xl font-bold tracking-tight text-foreground">
+              {step === 'otp' ? 'Two-Factor OTP Security' : 'PEKASA Terminal Sign In'}
             </h1>
-            <p className="text-muted-foreground text-center text-sm">
-              Sign in to continue your journey with PEKASA STORE
+            <p className="text-muted-foreground text-center text-xs">
+              {step === 'otp'
+                ? `Enter the 6-digit OTP code dispatched to ${contactInfo}`
+                : 'Role-Based Authentication for Administrators & Counter Cashiers'}
             </p>
           </div>
 
           {/* Error Message */}
-          {(errorMessage || localError) && (
+          {(propError || loginError || localError) && (
             <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs font-semibold text-center">
-              {errorMessage || localError}
+              {propError || loginError || localError}
             </div>
           )}
 
-          {/* Login Form */}
-          <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
-            <div className="relative">
-              <Input
-                type="text"
-                placeholder="Username or email (e.g. trevor or me@example.com)"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="bg-transparent ps-10 h-9 text-sm"
-                autoComplete="username email"
-                required
-              />
-              <Mail className="text-muted-foreground absolute start-3 top-1/2 size-4 -translate-y-1/2" />
-            </div>
-
-            <div className="relative">
-              <Input
-                type={showPassword ? "text" : "password"}
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="bg-transparent ps-10 pe-10 h-9 text-sm"
-                autoComplete="current-password"
-                required
-              />
-              <Lock className="text-muted-foreground absolute start-3 top-1/2 size-4 -translate-y-1/2" />
-              <Button
-                type="button"
-                variant="ghost"
-                className="absolute end-0 top-0 h-full cursor-pointer px-3 py-2 hover:bg-transparent"
-                onClick={() => setShowPassword((prev) => !prev)}
-              >
-                {showPassword ? (
-                  <EyeOffIcon className="size-4 text-muted-foreground" />
-                ) : (
-                  <EyeIcon className="size-4 text-muted-foreground" />
-                )}
-              </Button>
-            </div>
-
-            {/* Remember & Forgot */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="remember3"
-                  className="data-[state=checked]:bg-primary bg-transparent"
+          {step === 'credentials' ? (
+            /* STEP 1: CREDENTIALS */
+            <form className="flex flex-col gap-5" onSubmit={handleSubmitCredentials}>
+              <div className="relative">
+                <Input
+                  type="text"
+                  placeholder="Username, phone or email (e.g. trevor or cashier)"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="bg-transparent ps-10 h-10 text-sm"
+                  autoComplete="username"
+                  required
                 />
-                <label
-                  htmlFor="remember3"
-                  className="text-sm leading-none font-normal text-muted-foreground peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                >
-                  Remember me
-                </label>
+                <Mail className="text-muted-foreground absolute start-3 top-1/2 size-4 -translate-y-1/2" />
               </div>
-              <a
-                href="#forgot-password"
-                onClick={(e) => { e.preventDefault(); alert("Please contact store admin at 0727108749 or 0180366344 for password reset."); }}
-                className="ms-auto inline-block text-sm text-primary underline-offset-4 hover:underline"
-              >
-                Forgot password?
-              </a>
-            </div>
 
-            {/* Login Button */}
-            <Button
-              className="h-10 px-4 py-2 w-full cursor-pointer font-bold bg-[#FFD700] text-[#0B2D4A] hover:bg-[#FFD700]/90 shadow-md disabled:opacity-50"
-              type="submit"
-              disabled={loading}
-            >
-              {loading ? "Signing In..." : "Sign In"}
-            </Button>
-
-            {/* Social Login */}
-            <div className="relative my-6 text-center">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-border"></div>
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card text-muted-foreground px-2">
-                  Or continue with
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-3">
-              {socialButtons.map((button, index) => (
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="bg-transparent ps-10 pe-10 h-10 text-sm font-mono"
+                  autoComplete="current-password"
+                  required
+                />
+                <Lock className="text-muted-foreground absolute start-3 top-1/2 size-4 -translate-y-1/2" />
                 <Button
-                  key={index}
                   type="button"
-                  variant="outline"
-                  className="h-9 px-4 py-2 w-full cursor-pointer border-border hover:bg-muted"
-                  onClick={() => {
-                    alert(`${button.name} authentication is ready for integration.`);
-                  }}
+                  variant="ghost"
+                  className="absolute end-0 top-0 h-full cursor-pointer px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPassword((prev) => !prev)}
                 >
-                  {button.icon}
+                  {showPassword ? (
+                    <EyeOffIcon className="size-4 text-muted-foreground" />
+                  ) : (
+                    <EyeIcon className="size-4 text-muted-foreground" />
+                  )}
                 </Button>
-              ))}
-            </div>
-          </form>
+              </div>
 
-          {/* Sign Up Link */}
-          <p className="mt-6 flex justify-center gap-1 text-center text-sm text-muted-foreground">
-            <span>Don't have an account?</span>
-            <button
-              type="button"
-              onClick={onNavigateRegister || (() => alert("Registration is open at PEKASA STORE counters or call 0727108749."))}
-              className="text-primary font-semibold underline underline-offset-4 hover:text-primary/80 cursor-pointer"
-            >
-              Create an account
-            </button>
-          </p>
+              {/* Remember & Forgot */}
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="remember3"
+                    className="data-[state=checked]:bg-primary bg-transparent"
+                  />
+                  <label
+                    htmlFor="remember3"
+                    className="leading-none text-muted-foreground cursor-pointer"
+                  >
+                    Remember terminal
+                  </label>
+                </div>
+                <a
+                  href="#forgot-password"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    alert("Please contact Director Trevor Mbugua at 0727108749 or Peter Kamau at 0180366344 for cashier password resets.");
+                  }}
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  Forgot password?
+                </a>
+              </div>
+
+              {/* Login Button */}
+              <Button
+                className="h-10 px-4 py-2 w-full cursor-pointer font-bold bg-[#FFD700] text-[#0B2D4A] hover:bg-[#FFD700]/90 shadow-md disabled:opacity-50 text-sm"
+                type="submit"
+                disabled={loading}
+              >
+                {loading ? "Authenticating..." : "Sign In to Counter Terminal"}
+              </Button>
+
+              {/* Quick Preset Buttons for testing */}
+              <div className="pt-2 border-t border-border">
+                <p className="text-[11px] font-semibold text-muted-foreground mb-2 text-center uppercase tracking-wider">
+                  Quick Access Direct Credentials:
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleQuickFill("trevor", "Mbugua254")}
+                    className="p-2 bg-muted/60 hover:bg-muted border border-border rounded-lg text-left text-xs transition-colors cursor-pointer"
+                  >
+                    <div className="font-bold text-foreground flex items-center gap-1">
+                      <span>Trevor (Admin)</span>
+                    </div>
+                    <div className="text-[10px] text-muted-foreground font-mono">Pass: Mbugua254</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickFill("peter", "kamaupita")}
+                    className="p-2 bg-muted/60 hover:bg-muted border border-border rounded-lg text-left text-xs transition-colors cursor-pointer"
+                  >
+                    <div className="font-bold text-foreground flex items-center gap-1">
+                      <span>Peter (Admin)</span>
+                    </div>
+                    <div className="text-[10px] text-muted-foreground font-mono">Pass: kamaupita</div>
+                  </button>
+                </div>
+                <p className="text-[10px] text-center text-muted-foreground mt-2">
+                  💡 <em>Cashier accounts created by Trevor or Peter require OTP code entry upon signing in.</em>
+                </p>
+              </div>
+
+              {/* Social Login placeholders */}
+              <div className="relative my-2 text-center">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-border"></div>
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card text-muted-foreground px-2">
+                    Authorized Terminal Network
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                {socialButtons.map((button, index) => (
+                  <Button
+                    key={index}
+                    type="button"
+                    variant="outline"
+                    className="h-8 px-3 text-xs w-full cursor-pointer border-border hover:bg-muted"
+                    onClick={() => {
+                      alert(`${button.name} SSO authentication gateway connected.`);
+                    }}
+                  >
+                    {button.icon}
+                  </Button>
+                ))}
+              </div>
+            </form>
+          ) : (
+            /* STEP 2: OTP VERIFICATION FOR CASHIER */
+            <form className="flex flex-col gap-5" onSubmit={handleVerifyOtp}>
+              {/* Simulated OTP Notification Banner */}
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-1.5 text-xs text-amber-900 dark:text-amber-200">
+                <div className="flex items-center gap-1.5 font-bold">
+                  <Smartphone className="w-4 h-4 text-amber-500 animate-pulse" />
+                  <span>SMS & Email OTP Dispatched</span>
+                </div>
+                <p className="text-[11px] leading-relaxed">
+                  A 6-digit one-time code was sent to <strong>{contactInfo}</strong>.
+                </p>
+                {dispatchedOtp && (
+                  <div className="mt-2 p-2 bg-amber-500/20 rounded border border-amber-500/30 flex items-center justify-between">
+                    <span className="font-mono text-sm font-extrabold tracking-widest text-amber-600 dark:text-amber-300">
+                      OTP: {dispatchedOtp}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setOtpInput(dispatchedOtp)}
+                      className="px-2 py-0.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded text-[11px] transition-colors cursor-pointer"
+                    >
+                      Fill Code
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-foreground">Enter 6-Digit OTP Code</label>
+                <div className="relative">
+                  <Input
+                    type="text"
+                    maxLength={6}
+                    placeholder="123456"
+                    value={otpInput}
+                    onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))}
+                    className="h-12 text-center text-xl tracking-widest font-mono font-bold bg-transparent border-2 border-primary/40 focus:border-primary"
+                    autoFocus
+                    required
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground text-center">
+                  Code expires in 10 minutes.
+                </p>
+              </div>
+
+              <Button
+                className="h-10 px-4 py-2 w-full cursor-pointer font-bold bg-[#FFD700] text-[#0B2D4A] hover:bg-[#FFD700]/90 shadow-md disabled:opacity-50 text-sm"
+                type="submit"
+                disabled={loading || otpInput.length < 4}
+              >
+                {loading ? "Verifying OTP..." : "Verify Code & Start Cashier Shift"}
+              </Button>
+
+              <div className="flex items-center justify-between pt-2 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep("credentials");
+                    setOtpInput("");
+                    setLocalError(null);
+                  }}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Back to login</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setLocalError(null);
+                    const res = await requestLogin(email, password);
+                    if (res.demoOtp) {
+                      setDispatchedOtp(res.demoOtp);
+                      alert(`A new OTP has been dispatched to ${contactInfo}: ${res.demoOtp}`);
+                    }
+                  }}
+                  className="text-xs text-primary font-semibold underline underline-offset-2 hover:text-primary/80 cursor-pointer"
+                >
+                  Resend code
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Creation Link / Info */}
+          <div className="mt-5 pt-3 border-t border-border text-center text-xs text-muted-foreground">
+            <span>New cashier registration is reserved exclusively for</span>{" "}
+            <span className="font-bold text-foreground">Trevor Mbugua</span> &{" "}
+            <span className="font-bold text-foreground">Peter Kamau</span>.
+          </div>
         </Card>
       </div>
     </section>

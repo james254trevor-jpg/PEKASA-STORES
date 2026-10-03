@@ -23,6 +23,8 @@ import {
   OperatingExpense,
   TreasuryAccount,
   AuditLog,
+  CashierSession,
+  PaymentVoidRequest,
   DEFAULT_LTV_CONFIGS
 } from '../types';
 import { hashPassword, DEFAULT_SALT } from '../utils/security';
@@ -454,7 +456,52 @@ class SQLiteService {
         );
       `);
 
-      // Add missing columns to customers if upgrading
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS cashier_sessions (
+          id TEXT PRIMARY KEY,
+          cashier_id TEXT NOT NULL,
+          cashier_name TEXT NOT NULL,
+          branch_id TEXT NOT NULL,
+          session_date TEXT NOT NULL,
+          opened_at TEXT NOT NULL,
+          closed_at TEXT,
+          opening_cash REAL NOT NULL,
+          cash_collected REAL DEFAULT 0,
+          mpesa_collected REAL DEFAULT 0,
+          other_collected REAL DEFAULT 0,
+          expected_cash REAL DEFAULT 0,
+          actual_cash REAL,
+          difference REAL,
+          status TEXT NOT NULL DEFAULT 'OPEN',
+          reconciliation_status TEXT NOT NULL DEFAULT 'PENDING_APPROVAL',
+          reconciliation_approved_by TEXT,
+          reconciliation_notes TEXT,
+          notes TEXT
+        );
+      `);
+
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS payment_void_requests (
+          id TEXT PRIMARY KEY,
+          request_number TEXT UNIQUE NOT NULL,
+          payment_id TEXT NOT NULL,
+          receipt_number TEXT NOT NULL,
+          loan_number TEXT,
+          customer_name TEXT NOT NULL,
+          amount REAL NOT NULL,
+          cashier_id TEXT NOT NULL,
+          cashier_name TEXT NOT NULL,
+          reason TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'PENDING',
+          reviewed_by TEXT,
+          reviewed_at TEXT,
+          admin_notes TEXT,
+          created_at TEXT NOT NULL
+        );
+      `);
+
+      // Add missing columns if upgrading
+      try { this.db.run('ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1;'); } catch {}
       try { this.db.run('ALTER TABLE customers ADD COLUMN customer_number TEXT;'); } catch {}
       try { this.db.run('ALTER TABLE customers ADD COLUMN alt_phone TEXT;'); } catch {}
       try { this.db.run('ALTER TABLE customers ADD COLUMN county TEXT;'); } catch {}
@@ -497,6 +544,7 @@ class SQLiteService {
         role_id TEXT NOT NULL,
         role_title TEXT NOT NULL,
         branch_id TEXT,
+        is_active INTEGER DEFAULT 1,
         created_at TEXT NOT NULL,
         last_login TEXT
       );
@@ -965,7 +1013,9 @@ class SQLiteService {
       ('SAL', 2026, 0),
       ('EXP', 2026, 0),
       ('APP', 2026, 0),
-      ('INV', 2026, 0);
+      ('INV', 2026, 0),
+      ('VOD', 2026, 0),
+      ('SES', 2026, 0);
     `);
 
     // Clean Treasury Account (all starting at 0 for user to install personally)
@@ -1098,7 +1148,7 @@ class SQLiteService {
   }
 
   // --- Sequences Generator ---
-  public getNextSequence(prefix: 'LN' | 'COL' | 'CUS' | 'RCT' | 'TXN' | 'RNW' | 'SAL' | 'EXP' | 'APP' | 'INV'): string {
+  public getNextSequence(prefix: 'LN' | 'COL' | 'CUS' | 'RCT' | 'TXN' | 'RNW' | 'SAL' | 'EXP' | 'APP' | 'INV' | 'VOD' | 'SES'): string {
     const curYear = 2026;
     const row = this.query<{ last_sequence: number }>(
       'SELECT last_sequence FROM sequence_counters WHERE prefix = :p',
@@ -1453,6 +1503,367 @@ class SQLiteService {
       description: r.description,
       permissions: JSON.parse(r.permissions_json || '{}')
     }));
+  }
+
+  // --- Cashier Daily Sessions ---
+  public getCashierSessions(cashierId?: string): CashierSession[] {
+    const clause = cashierId ? `WHERE cashier_id = '${cashierId}'` : '';
+    const rows = this.query<any>(`SELECT * FROM cashier_sessions ${clause} ORDER BY opened_at DESC`);
+    return rows.map((r) => ({
+      ...r,
+      opening_cash: Number(r.opening_cash) || 0,
+      cash_collected: Number(r.cash_collected) || 0,
+      mpesa_collected: Number(r.mpesa_collected) || 0,
+      other_collected: Number(r.other_collected) || 0,
+      expected_cash: Number(r.expected_cash) || 0,
+      actual_cash: r.actual_cash !== null && r.actual_cash !== undefined ? Number(r.actual_cash) : null,
+      difference: r.difference !== null && r.difference !== undefined ? Number(r.difference) : null
+    }));
+  }
+
+  public getCurrentCashierSession(cashierId: string): CashierSession | null {
+    const sessions = this.getCashierSessions(cashierId);
+    return sessions.find((s) => s.status === 'OPEN') || null;
+  }
+
+  public openCashierSession(
+    cashierId: string,
+    cashierName: string,
+    branchId: string,
+    openingCash: number,
+    notes?: string
+  ): CashierSession {
+    const existing = this.getCurrentCashierSession(cashierId);
+    if (existing) {
+      return existing;
+    }
+    const id = 'ses-' + Date.now();
+    const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const today = nowStr.split(' ')[0];
+    const expected = Number(openingCash) || 0;
+
+    this.run(
+      `INSERT INTO cashier_sessions (
+        id, cashier_id, cashier_name, branch_id, session_date, opened_at,
+        opening_cash, cash_collected, mpesa_collected, other_collected,
+        expected_cash, status, reconciliation_status, notes
+      ) VALUES (
+        :id, :cid, :cn, :bid, :sd, :oa,
+        :oc, 0, 0, 0,
+        :ec, 'OPEN', 'PENDING_APPROVAL', :notes
+      )`,
+      {
+        ':id': id,
+        ':cid': cashierId,
+        ':cn': cashierName,
+        ':bid': branchId || 'br-nairobi',
+        ':sd': today,
+        ':oa': nowStr,
+        ':oc': Number(openingCash) || 0,
+        ':ec': expected,
+        ':notes': notes || 'Cashier counter session started'
+      }
+    );
+
+    this.logAudit(cashierName, 'OPEN_SESSION', 'CASHIER_SESSION', id, `Opened cashier session with KSh ${Number(openingCash).toLocaleString()} opening float`);
+    this.persist();
+    this.notify();
+
+    return this.getCashierSessions(cashierId)[0];
+  }
+
+  public closeCashierSession(
+    sessionId: string,
+    actualCash: number,
+    closingNotes?: string
+  ): CashierSession | null {
+    const session = this.query<any>('SELECT * FROM cashier_sessions WHERE id = :id', { ':id': sessionId })[0];
+    if (!session) return null;
+
+    const expectedCash = (Number(session.opening_cash) || 0) + (Number(session.cash_collected) || 0);
+    const diff = Number(actualCash) - expectedCash;
+    const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const reconcStatus = diff === 0 ? 'PENDING_APPROVAL' : 'DISCREPANCY_FLAGGED';
+
+    this.run(
+      `UPDATE cashier_sessions SET
+        closed_at = :ca,
+        expected_cash = :ec,
+        actual_cash = :ac,
+        difference = :diff,
+        status = 'CLOSED',
+        reconciliation_status = :rs,
+        notes = :notes
+       WHERE id = :id`,
+      {
+        ':id': sessionId,
+        ':ca': nowStr,
+        ':ec': expectedCash,
+        ':ac': Number(actualCash),
+        ':diff': diff,
+        ':rs': reconcStatus,
+        ':notes': closingNotes ? `${session.notes || ''} | Close: ${closingNotes}` : session.notes
+      }
+    );
+
+    const diffMsg = diff === 0 
+      ? 'Balanced (KSh 0)' 
+      : diff < 0 
+        ? `Shortage of KSh ${Math.abs(diff).toLocaleString()}` 
+        : `Overage of KSh ${diff.toLocaleString()}`;
+
+    this.logAudit(
+      session.cashier_name,
+      'CLOSE_SESSION',
+      'CASHIER_SESSION',
+      sessionId,
+      `Closed session. Expected: KSh ${expectedCash.toLocaleString()}, Actual: KSh ${Number(actualCash).toLocaleString()}, Diff: ${diffMsg}`
+    );
+
+    this.persist();
+    this.notify();
+
+    return this.getCashierSessions(session.cashier_id).find((s) => s.id === sessionId) || null;
+  }
+
+  public approveCashierSessionReconciliation(
+    sessionId: string,
+    adminName: string,
+    notes?: string
+  ): void {
+    const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    this.run(
+      `UPDATE cashier_sessions SET
+        reconciliation_status = 'APPROVED',
+        reconciliation_approved_by = :ab,
+        reconciliation_notes = :rn
+       WHERE id = :id`,
+      {
+        ':id': sessionId,
+        ':ab': adminName,
+        ':rn': notes || `Approved by ${adminName} on ${nowStr}`
+      }
+    );
+    this.logAudit(adminName, 'APPROVE_RECONCILIATION', 'CASHIER_SESSION', sessionId, `Approved daily cashier session reconciliation`);
+    this.persist();
+    this.notify();
+  }
+
+  public recordCashierCollection(cashierId: string, paymentMethod: string, amount: number): void {
+    const active = this.getCurrentCashierSession(cashierId);
+    if (!active) return;
+
+    const amt = Number(amount) || 0;
+    const isCash = paymentMethod === 'Cash';
+    const isMpesa = paymentMethod === 'M-Pesa';
+
+    if (isCash) {
+      this.run(
+        `UPDATE cashier_sessions SET 
+          cash_collected = cash_collected + :amt,
+          expected_cash = opening_cash + cash_collected + :amt
+         WHERE id = :id`,
+        { ':amt': amt, ':id': active.id }
+      );
+    } else if (isMpesa) {
+      this.run(
+        `UPDATE cashier_sessions SET 
+          mpesa_collected = mpesa_collected + :amt
+         WHERE id = :id`,
+        { ':amt': amt, ':id': active.id }
+      );
+    } else {
+      this.run(
+        `UPDATE cashier_sessions SET 
+          other_collected = other_collected + :amt
+         WHERE id = :id`,
+        { ':amt': amt, ':id': active.id }
+      );
+    }
+  }
+
+  // --- Payment Void / Correction Requests ---
+  public getPaymentVoidRequests(): PaymentVoidRequest[] {
+    return this.query<PaymentVoidRequest>('SELECT * FROM payment_void_requests ORDER BY created_at DESC');
+  }
+
+  public submitPaymentVoidRequest(req: {
+    payment_id: string;
+    receipt_number: string;
+    loan_number?: string;
+    customer_name: string;
+    amount: number;
+    cashier_id: string;
+    cashier_name: string;
+    reason: string;
+  }): PaymentVoidRequest {
+    const id = 'vreq-' + Date.now();
+    const reqNum = this.getNextSequence('VOD');
+    const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+    this.run(
+      `INSERT INTO payment_void_requests (
+        id, request_number, payment_id, receipt_number, loan_number,
+        customer_name, amount, cashier_id, cashier_name, reason, status, created_at
+      ) VALUES (
+        :id, :rn, :pid, :rcpt, :ln,
+        :cn, :amt, :cid, :cname, :rsn, 'PENDING', :ca
+      )`,
+      {
+        ':id': id,
+        ':rn': reqNum,
+        ':pid': req.payment_id,
+        ':rcpt': req.receipt_number,
+        ':ln': req.loan_number || null,
+        ':cn': req.customer_name,
+        ':amt': Number(req.amount),
+        ':cid': req.cashier_id,
+        ':cname': req.cashier_name,
+        ':rsn': req.reason,
+        ':ca': nowStr
+      }
+    );
+
+    this.logAudit(
+      req.cashier_name,
+      'SUBMIT_VOID_REQUEST',
+      'PAYMENT',
+      req.payment_id,
+      `Requested void/correction for receipt ${req.receipt_number} (KSh ${Number(req.amount).toLocaleString()}). Reason: ${req.reason}`
+    );
+
+    this.persist();
+    this.notify();
+
+    return this.getPaymentVoidRequests().find((r) => r.id === id)!;
+  }
+
+  public approvePaymentVoidRequest(requestId: string, adminName: string, adminNotes?: string): void {
+    const req = this.query<PaymentVoidRequest>('SELECT * FROM payment_void_requests WHERE id = :id', { ':id': requestId })[0];
+    if (!req) return;
+
+    const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+    // 1. Mark request approved
+    this.run(
+      `UPDATE payment_void_requests SET 
+        status = 'APPROVED',
+        reviewed_by = :rb,
+        reviewed_at = :ra,
+        admin_notes = :an
+       WHERE id = :id`,
+      {
+        ':id': requestId,
+        ':rb': adminName,
+        ':ra': nowStr,
+        ':an': adminNotes || `Void approved by ${adminName}`
+      }
+    );
+
+    // 2. Void the payment record from payments and ledger_transactions
+    try {
+      this.run('DELETE FROM payments WHERE id = :pid OR receipt_number = :rcpt', { ':pid': req.payment_id, ':rcpt': req.receipt_number });
+    } catch {}
+    try {
+      this.run('DELETE FROM ledger_transactions WHERE id = :pid OR receipt_number = :rcpt', { ':pid': req.payment_id, ':rcpt': req.receipt_number });
+    } catch {}
+
+    this.logAudit(
+      adminName,
+      'APPROVE_VOID_PAYMENT',
+      'PAYMENT',
+      req.payment_id,
+      `Approved void for receipt ${req.receipt_number} of KSh ${Number(req.amount).toLocaleString()} requested by ${req.cashier_name}`
+    );
+
+    this.persist();
+    this.notify();
+  }
+
+  public rejectPaymentVoidRequest(requestId: string, adminName: string, adminNotes?: string): void {
+    const req = this.query<PaymentVoidRequest>('SELECT * FROM payment_void_requests WHERE id = :id', { ':id': requestId })[0];
+    if (!req) return;
+
+    const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    this.run(
+      `UPDATE payment_void_requests SET 
+        status = 'REJECTED',
+        reviewed_by = :rb,
+        reviewed_at = :ra,
+        admin_notes = :an
+       WHERE id = :id`,
+      {
+        ':id': requestId,
+        ':rb': adminName,
+        ':ra': nowStr,
+        ':an': adminNotes || `Void request rejected by ${adminName}`
+      }
+    );
+
+    this.logAudit(
+      adminName,
+      'REJECT_VOID_PAYMENT',
+      'PAYMENT',
+      req.payment_id,
+      `Rejected void request for receipt ${req.receipt_number} by ${req.cashier_name}`
+    );
+
+    this.persist();
+    this.notify();
+  }
+
+  // --- Admin Cashier Account Controls ---
+  public toggleUserActive(userId: string, isActive: boolean, adminName: string): void {
+    this.run('UPDATE users SET is_active = :act WHERE id = :id', {
+      ':act': isActive ? 1 : 0,
+      ':id': userId
+    });
+    const user = this.query<User>('SELECT * FROM users WHERE id = :id', { ':id': userId })[0];
+    this.logAudit(
+      adminName,
+      isActive ? 'ACTIVATE_USER' : 'DEACTIVATE_USER',
+      'USER',
+      userId,
+      `${isActive ? 'Activated' : 'Deactivated'} account for ${user?.full_name || userId}`
+    );
+    this.persist();
+    this.notify();
+  }
+
+  public async resetUserPassword(userId: string, newPass: string, adminName: string): Promise<void> {
+    const hash = await hashPassword(newPass, DEFAULT_SALT);
+    this.run('UPDATE users SET password_hash = :hash, salt = :salt WHERE id = :id', {
+      ':hash': hash,
+      ':salt': DEFAULT_SALT,
+      ':id': userId
+    });
+    const user = this.query<User>('SELECT * FROM users WHERE id = :id', { ':id': userId })[0];
+    this.logAudit(
+      adminName,
+      'RESET_PASSWORD',
+      'USER',
+      userId,
+      `Reset password for ${user?.full_name || userId}`
+    );
+    this.persist();
+    this.notify();
+  }
+
+  public deleteUser(userId: string, adminName: string): void {
+    const user = this.query<User>('SELECT * FROM users WHERE id = :id', { ':id': userId })[0];
+    if (user?.username === 'trevor' || user?.username === 'peter') {
+      throw new Error('Primary Senior Partners Trevor and Peter cannot be deleted.');
+    }
+    this.run('DELETE FROM users WHERE id = :id', { ':id': userId });
+    this.logAudit(
+      adminName,
+      'DELETE_USER',
+      'USER',
+      userId,
+      `Permanently removed cashier account: ${user?.full_name || userId}`
+    );
+    this.persist();
+    this.notify();
   }
 
   // --- Audit Logs ---

@@ -5,6 +5,7 @@ import { formatKES } from '../utils/numbering';
 import { downloadReceiptPDF, downloadInvoicePDF } from '../utils/pdfGenerator';
 import { generateWhatsAppLink, createPaymentReceiptMessage } from '../utils/messaging';
 import { useAuth } from '../context/AuthContext';
+import { PaymentVoidModal } from './PaymentVoidModal';
 import { 
   Coins, 
   Search, 
@@ -18,11 +19,12 @@ import {
   Smartphone, 
   X, 
   CheckCircle2, 
-  FileText,
-  DollarSign,
-  Phone,
-  Eye,
-  Receipt
+  FileText, 
+  DollarSign, 
+  Phone, 
+  Eye, 
+  Receipt,
+  AlertTriangle
 } from 'lucide-react';
 
 interface PaymentsViewProps {
@@ -51,6 +53,10 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
     appliance?: Appliance;
     remainingBalance: number;
   } | null>(null);
+
+  // State for Void / Correction Request
+  const [isVoidModalOpen, setIsVoidModalOpen] = useState(false);
+  const [selectedPaymentForVoid, setSelectedPaymentForVoid] = useState<Payment | null>(null);
 
   // New Payment Form State
   const [selectedApplianceId, setSelectedApplianceId] = useState<string>(
@@ -142,6 +148,11 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
         payId,
         `Issued receipt ${rctCode} for KES ${amount} via ${paymentMethod} (Recv by ${receivedBy})`
       );
+
+      // Automatically credit active cashier daily session
+      if (currentUser?.id) {
+        sqliteService.recordCashierCollection(currentUser.id, paymentMethod, Number(amount));
+      }
 
       const newPaymentObj: Payment = {
         id: payId,
@@ -399,6 +410,18 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
                             title="Send Receipt to Customer WhatsApp"
                           >
                             <MessageSquare className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setSelectedPaymentForVoid(p);
+                              setIsVoidModalOpen(true);
+                            }}
+                            className="px-2 py-1 bg-rose-500/10 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 rounded-xl text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                            title="Submit Payment Void / Correction Request for Admin Approval"
+                          >
+                            <AlertTriangle className="w-3 h-3" />
+                            <span>Void</span>
                           </button>
                         </div>
                       </td>
@@ -753,6 +776,13 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Payment Void / Correction Request Modal */}
+      <PaymentVoidModal
+        isOpen={isVoidModalOpen}
+        onClose={() => setIsVoidModalOpen(false)}
+        selectedPayment={selectedPaymentForVoid}
+      />
     </div>
   );
 };

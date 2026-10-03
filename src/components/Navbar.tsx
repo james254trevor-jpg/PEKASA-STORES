@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { GlobalSearch } from './GlobalSearch';
+import { CashierSessionModal } from './CashierSessionModal';
 import { STORE_NAME, STORE_MOTTO } from '../types';
+import { formatKES } from '../utils/numbering';
 import { 
   Database, 
   LogOut, 
@@ -16,12 +18,16 @@ import {
   Eye,
   EyeOff,
   Lock,
+  Unlock,
   X,
   AlertCircle,
+  AlertTriangle,
   CheckCircle2,
   Sun,
   Moon,
-  Palette
+  Palette,
+  Coins,
+  DollarSign
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -45,11 +51,24 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAddCustomerWithItems,
   onGoToHome
 }) => {
-  const { currentUser, currentRole, users, switchUserWithPassword, logout } = useAuth();
+  const { 
+    currentUser, 
+    currentRole, 
+    users, 
+    isAdmin, 
+    isCashier, 
+    activeCashierSession, 
+    refreshActiveSession, 
+    switchUserWithPassword, 
+    logout 
+  } = useAuth();
+  
   const { themeMode, toggleThemeMode, openThemePanel, currentAccent } = useTheme();
 
   const isTrevor = currentUser?.username?.toLowerCase() === 'trevor';
   const partnerDeskTitle = isTrevor ? "Trevor's Desk" : "Peter's Desk";
+
+  const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
 
   // Password verification modal state for switching accounts
   const [isSwitchModalOpen, setIsSwitchModalOpen] = useState(false);
@@ -59,17 +78,26 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [switchError, setSwitchError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
 
-  const navLinks = [
-    { id: 'portal', label: partnerDeskTitle, isPersonal: true },
-    { id: 'dashboard', label: 'Command Center' },
-    { id: 'loans', label: 'Rehani Loans' },
-    { id: 'collateral', label: 'Collateral Vault' },
-    { id: 'customers', label: 'Customers' },
-    { id: 'payments', label: 'Ledger' },
-    { id: 'sales', label: 'Collateral Sales' },
-    { id: 'treasury', label: 'Treasury & Expenses' },
-    { id: 'partners', label: 'Admin & Reports' }
-  ];
+  // Role-based Nav Links
+  const navLinks = isCashier
+    ? [
+        { id: 'cashier-desk', label: 'Cashier Desk' },
+        { id: 'customers', label: 'Customers' },
+        { id: 'loans', label: 'Loans & Tickets' },
+        { id: 'collateral', label: 'Collateral Vault' },
+        { id: 'payments', label: 'Receive Payment' }
+      ]
+    : [
+        { id: 'portal', label: partnerDeskTitle, isPersonal: true },
+        { id: 'dashboard', label: 'Command Center' },
+        { id: 'loans', label: 'Rehani Loans' },
+        { id: 'collateral', label: 'Collateral Vault' },
+        { id: 'customers', label: 'Customers' },
+        { id: 'payments', label: 'Ledger' },
+        { id: 'sales', label: 'Collateral Sales' },
+        { id: 'treasury', label: 'Treasury & Expenses' },
+        { id: 'partners', label: 'Staff & Cashiers' }
+      ];
 
   const handleInitiateSwitch = (newUserId: string) => {
     if (newUserId === currentUser?.id) return;
@@ -100,7 +128,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     if (result.success) {
       setIsSwitchModalOpen(false);
       setPasswordInput('');
-      setActiveTab('portal');
+      setActiveTab(targetUser?.role_id === 'role-cashier' ? 'cashier-desk' : 'portal');
     } else {
       setSwitchError(result.error || 'Incorrect password.');
     }
@@ -112,7 +140,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Zone 1: Wordmark & Store Motto */}
         <div className="flex items-center gap-3 shrink-0">
           <button
-            onClick={() => setActiveTab('portal')}
+            onClick={() => setActiveTab(isCashier ? 'cashier-desk' : 'portal')}
             className="flex flex-col text-left group cursor-pointer"
             title={STORE_MOTTO}
           >
@@ -130,10 +158,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           </span>
         </div>
 
-        {/* Zone 2: Navigation Links with Tiffany & Glass styling */}
+        {/* Zone 2: Navigation Links */}
         <nav className="hidden lg:flex items-center gap-2 xl:gap-3 shrink-0">
           {navLinks.map((link) => {
-            const isActive = activeTab === link.id;
+            const isActive = activeTab === link.id || (isCashier && link.id === 'cashier-desk' && activeTab === 'portal');
             return (
               <button
                 key={link.id}
@@ -141,7 +169,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className={`text-xs xl:text-sm font-semibold tracking-wide transition-all whitespace-nowrap cursor-pointer px-3 py-1.5 rounded-xl border ${
                   isActive
                     ? 'bg-[#0ABAB5] text-black border-[#0ABAB5] font-extrabold shadow-lg shadow-[#0ABAB5]/20'
-                    : link.isPersonal
+                    : (link as any).isPersonal
                     ? 'bg-white/5 text-[#0ABAB5] border-[#0ABAB5]/30 hover:bg-[#0ABAB5]/10'
                     : 'text-slate-300 border-transparent hover:text-white hover:bg-white/5'
                 }`}
@@ -161,18 +189,46 @@ export const Navbar: React.FC<NavbarProps> = ({
           />
         </div>
 
-        {/* Zone 3: Primary actions & User Duty Switcher with Password Prompt */}
+        {/* Zone 3: Primary actions & Drawer widget */}
         <div className="flex items-center gap-2 shrink-0">
+          {/* Public Storefront Link */}
           {onGoToHome && (
             <button
               onClick={onGoToHome}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-[#FFD700] bg-[#FFD700]/10 hover:bg-[#FFD700]/20 border border-[#FFD700]/30 rounded-xl transition-all shadow-sm cursor-pointer"
               title="View Public PEKASA STORE Website"
             >
-              <span>🌐 Store Website</span>
+              <span>🌐 Storefront</span>
             </button>
           )}
 
+          {/* Cashier Drawer Session Trigger Button */}
+          {isCashier && (
+            <button
+              onClick={() => setIsSessionModalOpen(true)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                activeCashierSession
+                  ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/20'
+                  : 'bg-amber-500/15 border-amber-500/50 text-amber-300 hover:bg-amber-500/25 animate-pulse'
+              }`}
+              title="Open or Close Daily Cashier Session"
+            >
+              {activeCashierSession ? (
+                <>
+                  <Unlock className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="hidden sm:inline">Session: OPEN ({formatKES(activeCashierSession.opening_cash)})</span>
+                  <span className="sm:hidden">Open</span>
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Open Drawer</span>
+                </>
+              )}
+            </button>
+          )}
+
+          {/* Quick Intake Button */}
           {onOpenAddCustomerWithItems && (
             <button
               onClick={onOpenAddCustomerWithItems}
@@ -183,56 +239,47 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           )}
 
-          {/* Theme Mode Quick Switcher (Tiffany Dark <-> Professional Light) */}
+          {/* Backup Database Quick Action (Admins only) */}
+          {isAdmin && (
+            <button
+              onClick={onOpenBackup}
+              title="Database Backup & Restore (SQLite)"
+              className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-300 bg-white/5 hover:bg-white/10 border border-white/15 rounded-xl transition-all whitespace-nowrap cursor-pointer"
+            >
+              <HardDrive className="w-3.5 h-3.5" style={{ color: currentAccent.primary }} />
+              <span className="hidden xl:inline">Backup</span>
+            </button>
+          )}
+
+          {/* Theme Mode Quick Switcher */}
           <button
             onClick={toggleThemeMode}
-            title={themeMode === 'dark' ? 'Switch to Professional Light mode (Daytime operation)' : 'Switch to Tiffany Dark mode (Night operation)'}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-300 bg-white/5 hover:bg-white/10 border border-white/15 rounded-xl transition-all cursor-pointer"
+            title={themeMode === 'dark' ? 'Day Mode' : 'Night Mode'}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-300 bg-white/5 hover:bg-white/10 border border-white/15 rounded-xl transition-all cursor-pointer"
           >
             {themeMode === 'dark' ? (
-              <>
-                <Sun className="w-3.5 h-3.5 text-amber-400" />
-                <span className="hidden xl:inline text-[11px]">Day Mode</span>
-              </>
+              <Sun className="w-3.5 h-3.5 text-amber-400" />
             ) : (
-              <>
-                <Moon className="w-3.5 h-3.5" style={{ color: currentAccent.primary }} />
-                <span className="hidden xl:inline text-[11px]">Night Mode</span>
-              </>
+              <Moon className="w-3.5 h-3.5" style={{ color: currentAccent.primary }} />
             )}
           </button>
 
-          {/* Theme & Accent Colour Setting Panel Trigger */}
-          <button
-            onClick={openThemePanel}
-            title="Theme Colour Settings (Saved to LocalStorage)"
-            className="p-1.5 text-slate-300 bg-white/5 hover:bg-white/10 border border-white/15 rounded-xl transition-all cursor-pointer"
-          >
-            <Palette className="w-4 h-4" style={{ color: currentAccent.primary }} />
-          </button>
-
-          {/* Backup Database Quick Action */}
-          <button
-            onClick={onOpenBackup}
-            title="Database Backup & Restore (SQLite)"
-            className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-300 bg-white/5 hover:bg-white/10 border border-white/15 rounded-xl transition-all whitespace-nowrap cursor-pointer"
-          >
-            <HardDrive className="w-3.5 h-3.5" style={{ color: currentAccent.primary }} />
-            <span className="hidden xl:inline">Backup</span>
-          </button>
-
-          {/* Quick Counter Duty Switcher (Trevor <-> Peter with Password Auth) */}
+          {/* User Duty Switcher */}
           <div className="flex items-center bg-black/60 border border-white/15 rounded-xl p-1 shadow-inner">
             <span className="text-[11px] text-slate-400 pl-2 pr-1 hidden xl:inline font-mono">Duty:</span>
             <select
               value={currentUser?.id || ''}
               onChange={(e) => handleInitiateSwitch(e.target.value)}
               className="bg-transparent text-xs font-bold text-[#0ABAB5] focus:outline-none cursor-pointer pr-1"
-              title="Switch between Trevor and Peter with password verification"
+              title="Switch user account with password verification"
             >
               {users.map((u) => (
                 <option key={u.id} value={u.id} className="bg-slate-950 text-white">
-                  {u.username === 'trevor' ? 'Trevor Mbugua (Admin)' : u.username === 'peter' ? 'Peter Kamau (Admin)' : u.full_name}
+                  {u.username === 'trevor' 
+                    ? 'Trevor (Admin)' 
+                    : u.username === 'peter' 
+                      ? 'Peter (Admin)' 
+                      : `${u.full_name} (${u.role_title})`}
                 </option>
               ))}
             </select>
@@ -261,7 +308,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Mobile navigation bar */}
       <div className="lg:hidden flex items-center justify-around border-t border-white/10 py-2 bg-black/80 overflow-x-auto px-2 gap-1">
         {navLinks.map((link) => {
-          const isActive = activeTab === link.id;
+          const isActive = activeTab === link.id || (isCashier && link.id === 'cashier-desk' && activeTab === 'portal');
           return (
             <button
               key={link.id}
@@ -278,6 +325,13 @@ export const Navbar: React.FC<NavbarProps> = ({
         })}
       </div>
 
+      {/* Cashier Session Drawer Modal */}
+      <CashierSessionModal
+        isOpen={isSessionModalOpen}
+        onClose={() => setIsSessionModalOpen(false)}
+        onSessionUpdated={() => refreshActiveSession()}
+      />
+
       {/* ACCOUNT SWITCH PASSWORD VERIFICATION MODAL */}
       {isSwitchModalOpen && targetUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-xl p-4">
@@ -285,7 +339,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div className="flex items-center gap-2">
                 <Lock className="w-5 h-5 text-[#0ABAB5]" />
-                <h3 className="font-extrabold text-white text-base">Authorize Director Account Switch</h3>
+                <h3 className="font-extrabold text-white text-base">Authorize Account Switch</h3>
               </div>
               <button
                 type="button"
@@ -298,90 +352,76 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {/* Target Account Badge */}
             <div className="p-3.5 rounded-xl bg-black/50 border border-white/15 flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm ${
-                isTargetPeter ? 'bg-white text-black' : 'bg-[#0ABAB5] text-black'
-              }`}>
-                {targetUser.full_name.substring(0, 2).toUpperCase()}
+              <div className="w-10 h-10 rounded-full bg-[#0ABAB5]/20 border border-[#0ABAB5]/40 flex items-center justify-center text-[#0ABAB5] font-black text-sm">
+                {targetUser.full_name.charAt(0)}
               </div>
-              <div className="flex-1 min-w-0">
-                <span className="font-extrabold text-white text-sm block truncate">
-                  Switch to Director {targetUser.full_name}
-                </span>
-                <span className="text-[11px] text-slate-400">
-                  Account: <strong className="text-white font-mono">@{targetUser.username}</strong> ({targetUser.role_title})
-                </span>
+              <div>
+                <div className="font-bold text-white text-sm">{targetUser.full_name}</div>
+                <div className="text-[11px] text-slate-400 font-mono">
+                  Username: <span className="text-[#0ABAB5]">{targetUser.username}</span> · Role: {targetUser.role_title}
+                </div>
               </div>
             </div>
 
-            <form onSubmit={handleConfirmSwitch} className="space-y-4 text-xs">
-              {switchError && (
-                <div className="p-3 bg-rose-950/60 border border-rose-800/80 rounded-xl text-rose-300 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{switchError}</span>
-                </div>
-              )}
+            {switchError && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{switchError}</span>
+              </div>
+            )}
 
+            <form onSubmit={handleConfirmSwitch} className="space-y-4">
               <div>
-                <label className="block font-bold text-slate-300 mb-1">
-                  Enter Password for {targetUser.full_name} *
+                <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                  Enter Password for {targetUser.full_name}
                 </label>
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={passwordInput}
                     onChange={(e) => setPasswordInput(e.target.value)}
-                    placeholder="Enter account password..."
-                    className="w-full py-2.5 pl-3 pr-10 glass-input rounded-xl text-white text-xs focus:outline-none focus:border-[#0ABAB5]"
-                    required
+                    placeholder="Enter password..."
                     autoFocus
+                    className="w-full py-2.5 ps-3 pe-10 bg-black/60 border border-white/20 rounded-xl text-white text-sm font-mono focus:border-[#0ABAB5] focus:outline-none"
+                    required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-white cursor-pointer"
+                    className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
 
-              {/* Recommended Password Notice & Quick Fill Button */}
               {recommendedPassword && (
-                <div className="p-3 rounded-xl bg-[#0ABAB5]/10 border border-[#0ABAB5]/30 space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-[#0ABAB5] flex items-center gap-1">
-                      <KeyRound className="w-3.5 h-3.5" />
-                      <span>Recommended Authorization Password</span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setPasswordInput(recommendedPassword)}
-                      className="text-[10px] text-white font-mono bg-white/10 hover:bg-white/20 px-2 py-0.5 rounded cursor-pointer border border-white/20"
-                    >
-                      Fill
-                    </button>
-                  </div>
-                  <div className="text-[11px] text-slate-300 font-mono">
-                    Password for {targetUser.full_name}: <strong className="text-white bg-black/40 px-1.5 py-0.5 rounded font-bold">{recommendedPassword}</strong>
-                  </div>
+                <div className="p-2.5 rounded-lg bg-white/5 border border-white/10 flex items-center justify-between text-xs">
+                  <span className="text-slate-400">Default Password:</span>
+                  <button
+                    type="button"
+                    onClick={() => setPasswordInput(recommendedPassword)}
+                    className="font-mono text-[#0ABAB5] hover:underline font-bold"
+                  >
+                    Use "{recommendedPassword}"
+                  </button>
                 </div>
               )}
 
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-white/10">
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
                 <button
                   type="button"
                   onClick={() => setIsSwitchModalOpen(false)}
-                  className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold cursor-pointer border border-white/10"
+                  className="px-4 py-2 bg-white/10 hover:bg-white/15 text-slate-300 rounded-xl text-xs font-semibold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isVerifying}
-                  className="px-5 py-2.5 bg-[#0ABAB5] hover:bg-[#1FD2CD] text-black font-extrabold rounded-xl text-xs cursor-pointer shadow-lg shadow-[#0ABAB5]/20 flex items-center gap-1.5 disabled:opacity-50"
+                  className="px-5 py-2 bg-[#0ABAB5] hover:bg-[#1FD2CD] text-black font-extrabold rounded-xl text-xs cursor-pointer shadow-md shadow-[#0ABAB5]/20 disabled:opacity-50"
                 >
-                  <Lock className="w-4 h-4" />
-                  <span>{isVerifying ? 'Verifying...' : `Verify & Switch to ${isTargetPeter ? 'Peter' : 'Trevor'}`}</span>
+                  {isVerifying ? 'Verifying...' : 'Authenticate Switch'}
                 </button>
               </div>
             </form>
