@@ -86,16 +86,16 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({ isOpen, 
     }
   };
 
-  const handleResetToDemo = async () => {
-    if (!confirm('Are you sure you want to reset the database to clean demo state? Any unsaved changes will be replaced.')) {
+  const handleClearAllData = async () => {
+    if (!confirm('Are you sure you want to clear all customer names, loans, payments, and profit data? This will give you a clean slate to install your personal records. Admin accounts (Trevor and Peter) and store settings will be preserved.')) {
       return;
     }
     setIsProcessing(true);
     try {
-      await sqliteService.resetToDefaults();
-      setStatusMessage('Database restored to clean default seed data.');
+      await sqliteService.clearAllOperationalData();
+      setStatusMessage('All customer names, loans, and profit data have been cleared successfully. Ready for personal data entry!');
     } catch (e: any) {
-      setStatusMessage('Reset error: ' + e?.message);
+      setStatusMessage('Clear error: ' + e?.message);
     } finally {
       setIsProcessing(false);
     }
@@ -195,16 +195,44 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({ isOpen, 
             </div>
           </div>
 
+          {/* Clear Operational Data Section */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+              <span>3. Clean Slate for Personal Installation</span>
+              <span className="text-[10px] text-amber-400 font-normal">Admins Preserved</span>
+            </h3>
+            <div className="p-4 bg-rose-950/20 border border-rose-800/40 rounded-xl space-y-3">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <div className="text-xs font-semibold text-rose-300">Clear All Customer Names & Profit Records</div>
+                  <p className="text-[11px] text-slate-400">
+                    Wipes all customer profiles, collaterals, loans, payments, profit figures, and transactions so you can install and enter all your personal store records from a 100% clean baseline. Admin accounts (Trevor and Peter) remain active.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleClearAllData}
+                disabled={isProcessing}
+                className="w-full py-2.5 px-4 bg-rose-600/80 hover:bg-rose-600 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-rose-900/30 disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isProcessing ? 'animate-spin' : ''}`} />
+                <span>Clear All Customer Names, Loans & Profit Data Now</span>
+              </button>
+            </div>
+          </div>
+
           {/* Reset Option */}
           <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
             <button
               type="button"
-              onClick={handleResetToDemo}
+              onClick={handleClearAllData}
               disabled={isProcessing}
               className="text-xs text-slate-500 hover:text-rose-400 transition-colors flex items-center gap-1.5 cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isProcessing ? 'animate-spin' : ''}`} />
-              <span>Reset Database to Demo Seed</span>
+              <span>Reset to Clean Slate (Clear All Data)</span>
             </button>
 
             <button

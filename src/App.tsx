@@ -17,12 +17,17 @@ import { PartnersView } from './components/PartnersView';
 import { BackupRestoreModal } from './components/BackupRestoreModal';
 import { ThemeSettingsPanel } from './components/ThemeSettingsPanel';
 import { AddCustomerWithItemsModal } from './components/AddCustomerWithItemsModal';
+import { PublicHomePage } from './components/PublicHomePage';
+import LoginPage1 from '@/components/ui/login-page-1';
 import { Appliance, STORE_NAME, STORE_MOTTO } from './types';
 import { Database, HardDrive, Shield, Sun, Moon, Palette } from 'lucide-react';
 
 const MainApp: React.FC = () => {
-  const { currentUser, isLoading } = useAuth();
+  const { currentUser, isLoading, login, loginError } = useAuth();
   const { themeMode, toggleThemeMode, openThemePanel, currentAccent } = useTheme();
+
+  // View mode: 'home' (public storefront homepage) | 'portal' (internal Rehani management) | 'login' (shadcn LoginPage1)
+  const [viewMode, setViewMode] = useState<'home' | 'portal' | 'login'>('home');
 
   // Selected branch filter across the store
   const [selectedBranchId, setSelectedBranchId] = useState<string>('ALL');
@@ -42,20 +47,50 @@ const MainApp: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#06090e] flex flex-col items-center justify-center text-slate-400 gap-4 p-4">
-        <div className="w-14 h-14 rounded-2xl bg-[#0ABAB5]/10 border border-[#0ABAB5]/30 flex items-center justify-center text-[#0ABAB5] animate-pulse shadow-lg shadow-[#0ABAB5]/15">
+      <div className="min-h-screen bg-[#0B2D4A] flex flex-col items-center justify-center text-slate-400 gap-4 p-4">
+        <div className="w-14 h-14 rounded-2xl bg-[#FFD700]/10 border border-[#FFD700]/30 flex items-center justify-center text-[#FFD700] animate-pulse shadow-lg shadow-[#FFD700]/15">
           <Database className="w-7 h-7" />
         </div>
         <div className="text-center space-y-1">
           <h2 className="text-xl font-black text-white tracking-wider uppercase">{STORE_NAME}</h2>
-          <p className="text-xs text-[#0ABAB5] font-mono">Initializing WebAssembly SQLite Database...</p>
+          <p className="text-xs text-[#FFD700] font-mono">Initializing WebAssembly SQLite Database...</p>
         </div>
       </div>
     );
   }
 
-  if (!currentUser) {
-    return <LoginModal />;
+  // If in Public Homepage view
+  if (viewMode === 'home') {
+    return (
+      <PublicHomePage
+        onOpenPortal={() => {
+          if (currentUser) {
+            setViewMode('portal');
+          } else {
+            setViewMode('login');
+          }
+        }}
+        isLoggedIn={!!currentUser}
+      />
+    );
+  }
+
+  // If in Login view (or not signed in when trying to view portal)
+  if (viewMode === 'login' || !currentUser) {
+    return (
+      <LoginPage1
+        onLogin={async (identifier, pass) => {
+          const ok = await login(identifier, pass);
+          if (ok) {
+            setViewMode('portal');
+          }
+          return ok;
+        }}
+        onSuccess={() => setViewMode('portal')}
+        onClose={() => setViewMode('home')}
+        errorMessage={loginError}
+      />
+    );
   }
 
   const handleSelectApplianceFromOther = (applianceId: string) => {
@@ -96,6 +131,7 @@ const MainApp: React.FC = () => {
         onSelectCustomer={handleSelectCustomerFromOther}
         onSearchInTab={handleSearchInTab}
         onOpenAddCustomerWithItems={() => setIsAddCustomerWithItemsOpen(true)}
+        onGoToHome={() => setViewMode('home')}
       />
 
       {/* Main View Area */}

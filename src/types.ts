@@ -34,7 +34,8 @@ export interface User {
 
 export const STORE_NAME = 'PEKASA STORES';
 export const STORE_MOTTO = 'We buy and sell used second hand goods, cash against furnitures, fridges, TVs, Woofers, Gas cylinders, Mattress Etc.';
-export const STORE_TEL = '0727108749 / 0180366344';
+export const STORE_TEL = '0727108749';
+export const STORE_TEL_ALT = '0180366344';
 export const STORE_PHONES = ['0727108749', '0180366344'];
 
 export interface Branch {

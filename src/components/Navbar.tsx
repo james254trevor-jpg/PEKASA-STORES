@@ -32,6 +32,7 @@ interface NavbarProps {
   onSelectCustomer: (customerId: string) => void;
   onSearchInTab: (tab: string, query: string) => void;
   onOpenAddCustomerWithItems?: () => void;
+  onGoToHome?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -41,7 +42,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSelectAppliance,
   onSelectCustomer,
   onSearchInTab,
-  onOpenAddCustomerWithItems
+  onOpenAddCustomerWithItems,
+  onGoToHome
 }) => {
   const { currentUser, currentRole, users, switchUserWithPassword, logout } = useAuth();
   const { themeMode, toggleThemeMode, openThemePanel, currentAccent } = useTheme();
@@ -161,6 +163,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Zone 3: Primary actions & User Duty Switcher with Password Prompt */}
         <div className="flex items-center gap-2 shrink-0">
+          {onGoToHome && (
+            <button
+              onClick={onGoToHome}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-[#FFD700] bg-[#FFD700]/10 hover:bg-[#FFD700]/20 border border-[#FFD700]/30 rounded-xl transition-all shadow-sm cursor-pointer"
+              title="View Public PEKASA STORE Website"
+            >
+              <span>🌐 Store Website</span>
+            </button>
+          )}
+
           {onOpenAddCustomerWithItems && (
             <button
               onClick={onOpenAddCustomerWithItems}

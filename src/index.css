@@ -2,21 +2,73 @@
 
 @layer base {
   :root {
-    --tiffany-blue: #0ABAB5;
-    --tiffany-light: #20B2AA;
-    --tiffany-glow: rgba(10, 186, 181, 0.25);
-    --accent-color: #0ABAB5;
-    --accent-hover: #1FD2CD;
-    --accent-glow: rgba(10, 186, 181, 0.25);
-    --accent-badge-bg: rgba(10, 186, 181, 0.12);
-    --accent-badge-border: rgba(10, 186, 181, 0.35);
+    --background: #f8fafc;
+    --foreground: #0b2d4a;
+    --card: #ffffff;
+    --card-foreground: #0b2d4a;
+    --popover: #ffffff;
+    --popover-foreground: #0b2d4a;
+    --primary: #0b2d4a;
+    --primary-foreground: #ffffff;
+    --secondary: #f1f5f9;
+    --secondary-foreground: #0b2d4a;
+    --muted: #f1f5f9;
+    --muted-foreground: #64748b;
+    --accent: #ffd700;
+    --accent-foreground: #0b2d4a;
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+    --border: #e2e8f0;
+    --input: #e2e8f0;
+    --ring: #ffd700;
+    --radius: 0.5rem;
+
+    /* PEKASA STORE Brand Color Palette */
+    --navy-primary: #0B2D4A;
+    --gold-accent: #FFD700;
+    --slate-card: #1F2937;
+    --soft-white: #F8FAFC;
+    --text-slate: #64748B;
+    --emerald-success: #10B981;
+    --amber-warning: #F59E0B;
+    --danger-red: #EF4444;
+
+    /* Dynamic accent mapping for custom themes */
+    --accent-color: #FFD700;
+    --accent-hover: #E6C200;
+    --accent-glow: rgba(255, 215, 0, 0.25);
+    --accent-badge-bg: rgba(255, 215, 0, 0.12);
+    --accent-badge-border: rgba(255, 215, 0, 0.35);
+  }
+
+  .dark {
+    --background: #0B2D4A;
+    --foreground: #F8FAFC;
+    --card: #1F2937;
+    --card-foreground: #F8FAFC;
+    --popover: #1F2937;
+    --popover-foreground: #F8FAFC;
+    --primary: #FFD700;
+    --primary-foreground: #0B2D4A;
+    --secondary: #111827;
+    --secondary-foreground: #F8FAFC;
+    --muted: #1e293b;
+    --muted-foreground: #94A3B8;
+    --accent: #FFD700;
+    --accent-foreground: #0B2D4A;
+    --destructive: #EF4444;
+    --destructive-foreground: #ffffff;
+    --border: #374151;
+    --input: #374151;
+    --ring: #FFD700;
   }
 
   body {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background-color: #06090e;
-    color: #f8fafc;
+    background-color: var(--background);
+    color: var(--foreground);
     transition: background-color 0.2s ease, color 0.2s ease;
+    scroll-behavior: smooth;
   }
   
   .font-mono-numbers {
@@ -25,183 +77,65 @@
   }
 }
 
-/* Tiffany Blue and Accent styling utilities */
-.text-tiffany {
-  color: var(--accent-color, #0ABAB5);
+/* Brand Utility Classes */
+.bg-deep-navy {
+  background-color: #0B2D4A;
 }
-.bg-tiffany {
-  background-color: var(--accent-color, #0ABAB5);
+.text-deep-navy {
+  color: #0B2D4A;
 }
-.border-tiffany {
-  border-color: var(--accent-color, #0ABAB5);
-}
-.ring-tiffany:focus {
-  --tw-ring-color: var(--accent-color, #0ABAB5);
+.border-deep-navy {
+  border-color: #0B2D4A;
 }
 
-/* Dark Mode Glassmorphism (Default: Tiffany Dark) */
+.bg-gold {
+  background-color: #FFD700;
+}
+.text-gold {
+  color: #FFD700;
+}
+.border-gold {
+  border-color: #FFD700;
+}
+
+.bg-dark-slate {
+  background-color: #1F2937;
+}
+
+/* Glassmorphism styling */
 .glass-panel {
-  background: rgba(10, 17, 26, 0.76);
+  background: rgba(11, 45, 74, 0.85);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.7), 0 0 20px -5px var(--accent-glow, rgba(10, 186, 181, 0.08));
+  border: 1px solid rgba(255, 215, 0, 0.15);
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5), 0 0 20px -5px rgba(255, 215, 0, 0.1);
 }
 
 .glass-card {
-  background: rgba(15, 23, 36, 0.55);
+  background: rgba(31, 41, 55, 0.7);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .glass-card:hover {
-  border-color: var(--accent-color, rgba(10, 186, 181, 0.28));
-}
-
-.glass-input {
-  background: rgba(4, 8, 14, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(8px);
-}
-
-.glass-input:focus {
-  border-color: var(--accent-color, #0ABAB5);
-  box-shadow: 0 0 0 1px var(--accent-color, #0ABAB5), 0 0 16px -2px var(--accent-glow, rgba(10, 186, 181, 0.25));
-}
-
-/* ========================================================================= */
-/* PROFESSIONAL LIGHT MODE (Engineered for daytime counter clarity & sunlight) */
-/* ========================================================================= */
-html.theme-light body {
-  background-color: #f1f5f9;
-  color: #0f172a;
-}
-
-html.theme-light .glass-panel {
-  background: rgba(255, 255, 255, 0.90);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(203, 213, 225, 0.85);
-  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.06), 0 4px 6px -2px rgba(15, 23, 42, 0.03);
-}
-
-html.theme-light .glass-card {
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(226, 232, 240, 0.95);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
-}
-
-html.theme-light .glass-card:hover {
-  border-color: var(--accent-color, #0ABAB5);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-}
-
-html.theme-light .glass-input {
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
-  color: #0f172a;
-}
-
-html.theme-light .glass-input:focus {
-  border-color: var(--accent-color, #0ABAB5);
-  box-shadow: 0 0 0 2px var(--accent-badge-border, rgba(10, 186, 181, 0.35));
-}
-
-/* Light mode text contrast overrides */
-html.theme-light .text-white {
-  color: #0f172a !important;
-}
-
-html.theme-light .text-slate-100,
-html.theme-light .text-slate-200 {
-  color: #1e293b !important;
-}
-
-html.theme-light .text-slate-300 {
-  color: #334155 !important;
-}
-
-html.theme-light .text-slate-400 {
-  color: #64748b !important;
-}
-
-html.theme-light .text-slate-500 {
-  color: #64748b !important;
-}
-
-html.theme-light header {
-  background-color: rgba(255, 255, 255, 0.92) !important;
-  border-bottom-color: #cbd5e1 !important;
-}
-
-html.theme-light .bg-slate-900,
-html.theme-light .bg-slate-950 {
-  background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
-}
-
-html.theme-light .bg-black\/80,
-html.theme-light .bg-black\/60,
-html.theme-light .bg-black\/50,
-html.theme-light .bg-black\/40 {
-  background-color: rgba(248, 250, 252, 0.95) !important;
-  border-color: #e2e8f0 !important;
-}
-
-html.theme-light .bg-white\/5,
-html.theme-light .bg-white\/10 {
-  background-color: rgba(241, 245, 249, 0.9) !important;
-  border-color: #e2e8f0 !important;
-}
-
-html.theme-light .border-white\/10,
-html.theme-light .border-white\/15,
-html.theme-light .border-white\/20 {
-  border-color: #cbd5e1 !important;
-}
-
-html.theme-light .border-slate-800,
-html.theme-light .border-slate-700 {
-  border-color: #cbd5e1 !important;
-}
-
-html.theme-light select option {
-  background-color: #ffffff !important;
-  color: #0f172a !important;
-}
-
-html.theme-light input::placeholder,
-html.theme-light textarea::placeholder {
-  color: #94a3b8 !important;
+  border-color: #FFD700;
 }
 
 /* Custom subtle scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(6, 9, 14, 0.8);
+  background: #0B2D4A;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--accent-color, rgba(10, 186, 181, 0.3));
-  border-radius: 3px;
+  background: #FFD700;
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--accent-hover, rgba(10, 186, 181, 0.6));
-}
-
-html.theme-light ::-webkit-scrollbar-track {
-  background: #f1f5f9;
-}
-html.theme-light ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-}
-html.theme-light ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #E6C200;
 }
 
 /* Print specific styles for Receipts & Invoices */

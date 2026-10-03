@@ -72,10 +72,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (username: string, password: string): Promise<boolean> => {
     setLoginError(null);
     const uList = sqliteService.getUsers();
-    const user = uList.find((u) => u.username.toLowerCase() === username.trim().toLowerCase());
+    const cleanIdentifier = username.trim().toLowerCase();
+    const user = uList.find(
+      (u) => u.username.toLowerCase() === cleanIdentifier || u.email.toLowerCase() === cleanIdentifier
+    );
 
     if (!user) {
-      setLoginError('Invalid username. Only registered authorized operators have access.');
+      setLoginError('Invalid username or email. Only authorized staff and partners have access.');
       return false;
     }
 

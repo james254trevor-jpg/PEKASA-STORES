@@ -310,6 +310,150 @@ class SQLiteService {
         );
       `);
 
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS audit_logs (
+          id TEXT PRIMARY KEY,
+          user_name TEXT NOT NULL,
+          action TEXT NOT NULL,
+          entity_type TEXT NOT NULL,
+          entity_id TEXT NOT NULL,
+          details TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+      `);
+
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS sequence_counters (
+          prefix TEXT PRIMARY KEY,
+          current_year INTEGER NOT NULL,
+          last_sequence INTEGER NOT NULL
+        );
+      `);
+
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS appliances (
+          id TEXT PRIMARY KEY,
+          appliance_number TEXT UNIQUE NOT NULL,
+          customer_id TEXT NOT NULL,
+          category TEXT NOT NULL,
+          custom_category TEXT,
+          brand TEXT NOT NULL,
+          model TEXT NOT NULL,
+          serial_number TEXT,
+          condition TEXT NOT NULL,
+          market_value REAL NOT NULL,
+          amount_received REAL NOT NULL,
+          funder TEXT NOT NULL,
+          date_received TEXT NOT NULL,
+          due_date TEXT NOT NULL,
+          status TEXT NOT NULL,
+          technician_name TEXT,
+          interest_charges REAL DEFAULT 0,
+          notes TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+      `);
+
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS payments (
+          id TEXT PRIMARY KEY,
+          receipt_number TEXT UNIQUE NOT NULL,
+          appliance_id TEXT NOT NULL,
+          customer_id TEXT NOT NULL,
+          amount REAL NOT NULL,
+          payment_method TEXT NOT NULL,
+          mpesa_code TEXT,
+          mpesa_phone TEXT,
+          mpesa_sender TEXT,
+          received_by TEXT NOT NULL,
+          notes TEXT,
+          payment_date TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+      `);
+
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS appliance_photos (
+          id TEXT PRIMARY KEY,
+          appliance_id TEXT NOT NULL,
+          photo_url TEXT NOT NULL,
+          caption TEXT,
+          uploaded_at TEXT NOT NULL
+        );
+      `);
+
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS invoices (
+          id TEXT PRIMARY KEY,
+          invoice_number TEXT UNIQUE NOT NULL,
+          appliance_id TEXT,
+          customer_id TEXT NOT NULL,
+          issue_date TEXT NOT NULL,
+          due_date TEXT NOT NULL,
+          subtotal REAL NOT NULL DEFAULT 0,
+          tax REAL NOT NULL DEFAULT 0,
+          total_amount REAL NOT NULL DEFAULT 0,
+          status TEXT NOT NULL DEFAULT 'Unpaid',
+          notes TEXT,
+          created_at TEXT NOT NULL
+        );
+      `);
+
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS invoice_items (
+          id TEXT PRIMARY KEY,
+          invoice_id TEXT NOT NULL,
+          description TEXT NOT NULL,
+          quantity REAL NOT NULL DEFAULT 1,
+          unit_price REAL NOT NULL DEFAULT 0,
+          total_price REAL NOT NULL DEFAULT 0
+        );
+      `);
+
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS parts (
+          id TEXT PRIMARY KEY,
+          sku TEXT UNIQUE NOT NULL,
+          name TEXT NOT NULL,
+          category TEXT NOT NULL,
+          supplier_id TEXT,
+          cost_price REAL NOT NULL DEFAULT 0,
+          selling_price REAL NOT NULL DEFAULT 0,
+          quantity INTEGER NOT NULL DEFAULT 0,
+          reorder_level INTEGER NOT NULL DEFAULT 0,
+          location TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+      `);
+
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS stock_movements (
+          id TEXT PRIMARY KEY,
+          part_id TEXT NOT NULL,
+          movement_type TEXT NOT NULL,
+          quantity INTEGER NOT NULL,
+          reference_type TEXT NOT NULL,
+          reference_id TEXT,
+          notes TEXT,
+          created_by TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+      `);
+
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS suppliers (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          contact_person TEXT,
+          phone TEXT NOT NULL,
+          email TEXT,
+          address TEXT,
+          created_at TEXT NOT NULL
+        );
+      `);
+
       // Add missing columns to customers if upgrading
       try { this.db.run('ALTER TABLE customers ADD COLUMN customer_number TEXT;'); } catch {}
       try { this.db.run('ALTER TABLE customers ADD COLUMN alt_phone TEXT;'); } catch {}
@@ -645,6 +789,87 @@ class SQLiteService {
         received_by TEXT NOT NULL,
         notes TEXT,
         payment_date TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+    `);
+
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS appliance_photos (
+        id TEXT PRIMARY KEY,
+        appliance_id TEXT NOT NULL,
+        photo_url TEXT NOT NULL,
+        caption TEXT,
+        uploaded_at TEXT NOT NULL
+      );
+    `);
+
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS invoices (
+        id TEXT PRIMARY KEY,
+        invoice_number TEXT UNIQUE NOT NULL,
+        appliance_id TEXT,
+        customer_id TEXT NOT NULL,
+        issue_date TEXT NOT NULL,
+        due_date TEXT NOT NULL,
+        subtotal REAL NOT NULL DEFAULT 0,
+        tax REAL NOT NULL DEFAULT 0,
+        total_amount REAL NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'Unpaid',
+        notes TEXT,
+        created_at TEXT NOT NULL
+      );
+    `);
+
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS invoice_items (
+        id TEXT PRIMARY KEY,
+        invoice_id TEXT NOT NULL,
+        description TEXT NOT NULL,
+        quantity REAL NOT NULL DEFAULT 1,
+        unit_price REAL NOT NULL DEFAULT 0,
+        total_price REAL NOT NULL DEFAULT 0
+      );
+    `);
+
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS parts (
+        id TEXT PRIMARY KEY,
+        sku TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        category TEXT NOT NULL,
+        supplier_id TEXT,
+        cost_price REAL NOT NULL DEFAULT 0,
+        selling_price REAL NOT NULL DEFAULT 0,
+        quantity INTEGER NOT NULL DEFAULT 0,
+        reorder_level INTEGER NOT NULL DEFAULT 0,
+        location TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `);
+
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS stock_movements (
+        id TEXT PRIMARY KEY,
+        part_id TEXT NOT NULL,
+        movement_type TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        reference_type TEXT NOT NULL,
+        reference_id TEXT,
+        notes TEXT,
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+    `);
+
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS suppliers (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        contact_person TEXT,
+        phone TEXT NOT NULL,
+        email TEXT,
+        address TEXT,
         created_at TEXT NOT NULL
       );
     `);
@@ -1139,28 +1364,50 @@ class SQLiteService {
 
   public async clearAllOperationalData(): Promise<void> {
     if (!this.db) return;
-    this.db.run('DELETE FROM customers;');
-    this.db.run('DELETE FROM collateral_items;');
-    this.db.run('DELETE FROM appliances;');
-    this.db.run('DELETE FROM rehani_loans;');
-    this.db.run('DELETE FROM loan_renewals;');
-    this.db.run('DELETE FROM ledger_transactions;');
-    this.db.run('DELETE FROM collateral_sales;');
-    this.db.run('DELETE FROM operating_expenses;');
-    this.db.run('DELETE FROM appliance_photos;');
-    this.db.run('DELETE FROM invoices;');
-    this.db.run('DELETE FROM invoice_items;');
-    this.db.run('DELETE FROM audit_logs;');
+    try {
+      this.db.run('PRAGMA foreign_keys = OFF;');
+    } catch {}
+
+    const tablesToClear = [
+      'customers',
+      'collateral_items',
+      'appliances',
+      'rehani_loans',
+      'loan_renewals',
+      'ledger_transactions',
+      'collateral_sales',
+      'operating_expenses',
+      'appliance_photos',
+      'invoices',
+      'invoice_items',
+      'payments',
+      'stock_movements',
+      'audit_logs'
+    ];
+
+    for (const table of tablesToClear) {
+      try {
+        this.db.run(`DELETE FROM ${table};`);
+      } catch {
+        // Table might not exist yet; safe to ignore
+      }
+    }
+
     try {
       this.db.run('UPDATE sequence_counters SET last_sequence = 0;');
     } catch {}
     try {
       this.db.run('UPDATE treasury SET cash_in_vault = 0, mpesa_till_balance = 0, bank_balance = 0, trevor_capital = 0, peter_capital = 0, retained_profit = 0;');
     } catch {}
-    this.db.run(`
-      INSERT INTO audit_logs (id, user_name, action, entity_type, entity_id, details, created_at) VALUES
-      ('aud-clean', 'System', 'CLEAR_DATA', 'DATABASE', 'db-clean', 'Cleared all customer, loan, transaction, and profit data. Ready for personal data entry.', '${new Date().toISOString().replace('T', ' ').substring(0, 19)}');
-    `);
+    try {
+      this.db.run(`
+        INSERT INTO audit_logs (id, user_name, action, entity_type, entity_id, details, created_at) VALUES
+        ('aud-clean', 'System', 'CLEAR_DATA', 'DATABASE', 'db-clean', 'Cleared all customer, loan, transaction, and profit data. Ready for personal data entry.', '${new Date().toISOString().replace('T', ' ').substring(0, 19)}');
+      `);
+    } catch {}
+    try {
+      this.db.run('PRAGMA foreign_keys = ON;');
+    } catch {}
     await this.persist();
     this.notify();
   }
@@ -1273,15 +1520,27 @@ class SQLiteService {
   }
 
   public getInvoices(): any[] {
-    return this.query('SELECT * FROM invoices');
+    try {
+      return this.query('SELECT * FROM invoices');
+    } catch {
+      return [];
+    }
   }
 
   public getParts(): any[] {
-    return this.query('SELECT * FROM parts');
+    try {
+      return this.query('SELECT * FROM parts');
+    } catch {
+      return [];
+    }
   }
 
   public getSuppliers(): any[] {
-    return this.query('SELECT * FROM suppliers');
+    try {
+      return this.query('SELECT * FROM suppliers');
+    } catch {
+      return [];
+    }
   }
 
   public updateCustomerPhoto(customerId: string, photoUrl: string): void {
@@ -1327,11 +1586,19 @@ class SQLiteService {
   }
 
   public getAppliancePhotos(applianceId: string): any[] {
-    return this.query('SELECT * FROM appliance_photos WHERE appliance_id = :id', { ':id': applianceId });
+    try {
+      return this.query('SELECT * FROM appliance_photos WHERE appliance_id = :id', { ':id': applianceId });
+    } catch {
+      return [];
+    }
   }
 
   public getPaymentsForAppliance(applianceId: string): any[] {
-    return this.query('SELECT * FROM ledger_transactions WHERE collateral_id = :id OR loan_id = :id OR appliance_id = :id', { ':id': applianceId });
+    try {
+      return this.query('SELECT * FROM ledger_transactions WHERE collateral_id = :id OR loan_id = :id OR appliance_id = :id', { ':id': applianceId });
+    } catch {
+      return [];
+    }
   }
 
   public issuePartToAppliance(partId: string, applianceId: string, quantity: number, issuedBy: string): void {
@@ -1356,7 +1623,11 @@ class SQLiteService {
   }
 
   public getStockMovements(): any[] {
-    return this.query('SELECT * FROM stock_movements ORDER BY created_at DESC');
+    try {
+      return this.query('SELECT * FROM stock_movements ORDER BY created_at DESC');
+    } catch {
+      return [];
+    }
   }
 
   public recordStockMovement(
