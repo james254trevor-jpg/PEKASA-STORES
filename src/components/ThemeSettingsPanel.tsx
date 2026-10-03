@@ -107,7 +107,7 @@ export const ThemeSettingsPanel: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setThemeMode('light')}
-                className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative group ${
+                className={`theme-static p-4 rounded-2xl border text-left transition-all cursor-pointer relative group ${
                   themeMode === 'light'
                     ? 'bg-slate-100 border-[#0ABAB5] shadow-lg shadow-black/10 ring-2 ring-[#0ABAB5] text-slate-900'
                     : 'bg-white/10 border-white/15 hover:border-white/25'
@@ -190,7 +190,7 @@ export const ThemeSettingsPanel: React.FC = () => {
             </label>
 
             <div 
-              className={`p-4 rounded-2xl border transition-all ${
+              className={`theme-static p-4 rounded-2xl border transition-all ${
                 themeMode === 'light' ? 'bg-white border-slate-300 text-slate-900 shadow-md' : 'bg-black/40 border-white/10 text-white'
               }`}
             >

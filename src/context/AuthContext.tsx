@@ -288,7 +288,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!isValid) {
       return { 
         success: false, 
-        error: `Incorrect password for ${targetUser.full_name}. Please input the recommended password.` 
+        error: `Incorrect password for ${targetUser.full_name}. Please try again.`
       };
     }
 

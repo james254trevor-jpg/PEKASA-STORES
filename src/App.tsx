@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { Navbar } from './components/Navbar';
+import { Sidebar } from './components/Sidebar';
 import { LoginModal } from './components/LoginModal';
 import { DashboardView } from './components/DashboardView';
 import { PartnerPersonalPortal } from './components/PartnerPersonalPortal';
@@ -129,7 +130,11 @@ const MainApp: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col font-sans transition-colors duration-200">
+    <div className="min-h-screen flex font-sans transition-colors duration-200">
+      {/* Left navigation panel (desktop) */}
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+
+      <div className="flex-1 min-w-0 flex flex-col">
       {/* Top Header with Global Search and Theme Controls */}
       <Navbar
         activeTab={activeTab}
@@ -385,6 +390,7 @@ const MainApp: React.FC = () => {
           </div>
         </div>
       </footer>
+      </div>
 
       {/* Floating Quick Theme Setting Button on bottom right for instant daytime/nighttime counter access */}
       <div className="fixed bottom-5 right-5 z-40 flex items-center gap-2">

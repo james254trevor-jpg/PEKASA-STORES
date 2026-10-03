@@ -159,7 +159,7 @@ export const PublicHomePage: React.FC<PublicHomePageProps> = ({ onOpenPortal, is
   ];
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-[#0B2D4A] font-sans antialiased selection:bg-[#FFD700] selection:text-[#0B2D4A]">
+    <div className="theme-static min-h-screen bg-[#F8FAFC] text-[#0B2D4A] font-sans antialiased selection:bg-[#FFD700] selection:text-[#0B2D4A]">
       {/* 1. TOP INFORMATION BAR */}
       <div className="bg-[#0B2D4A] text-white border-b border-[#0B2D4A]/50 text-xs py-2 px-4 select-none">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">

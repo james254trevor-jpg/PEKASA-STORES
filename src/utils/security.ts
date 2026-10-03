@@ -19,7 +19,7 @@ export async function verifyPassword(
   salt: string = DEFAULT_SALT
 ): Promise<boolean> {
   const trimmed = inputPassword.trim();
-  // Strip optional parentheses if user typed "(Mbugua254)" or "Mbugua254"
+  // Accept the password with or without surrounding parentheses
   const stripped = trimmed.replace(/^\((.*)\)$/, '$1');
   const wrapped = `(${stripped})`;
 
