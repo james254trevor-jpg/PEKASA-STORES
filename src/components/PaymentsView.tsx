@@ -662,7 +662,7 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
             </div>
 
             {/* Thermal Receipt Body */}
-            <div className="p-6 bg-white text-black font-mono text-xs space-y-3 print-receipt-container">
+            <div className="theme-static p-6 bg-white text-black font-mono text-xs space-y-3 print-receipt-container">
               {/* Receipt Header */}
               <div className="text-center space-y-1 border-b border-black pb-3">
                 <h2 className="text-xl font-black uppercase tracking-wider">{STORE_NAME}</h2>

@@ -119,12 +119,6 @@ export function LoginPage3({ onSuccess, onNavigateRegister, onClose, errorMessag
     }
   };
 
-  const handleQuickFill = (user: string, pass: string) => {
-    setEmail(user);
-    setPassword(pass);
-    setLocalError(null);
-  };
-
   return (
     <section className="from-background to-muted/50 relative isolate flex min-h-dvh w-full items-center justify-center overflow-hidden bg-gradient-to-br py-8">
       <div className="relative z-10 container mx-auto flex min-h-dvh items-center justify-center px-4 py-8">
@@ -175,7 +169,7 @@ export function LoginPage3({ onSuccess, onNavigateRegister, onClose, errorMessag
               <div className="relative">
                 <Input
                   type="text"
-                  placeholder="Username, phone or email (e.g. trevor or cashier)"
+                  placeholder="Username, phone or email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="bg-transparent ps-10 h-10 text-sm"
@@ -228,7 +222,7 @@ export function LoginPage3({ onSuccess, onNavigateRegister, onClose, errorMessag
                   href="#forgot-password"
                   onClick={(e) => {
                     e.preventDefault();
-                    alert("Please contact Director Trevor Mbugua at 0727108749 or Peter Kamau at 0180366344 for cashier password resets.");
+                    alert("Please contact an administrator to reset your password.");
                   }}
                   className="text-primary underline-offset-4 hover:underline"
                 >
@@ -245,37 +239,9 @@ export function LoginPage3({ onSuccess, onNavigateRegister, onClose, errorMessag
                 {loading ? "Authenticating..." : "Sign In to Counter Terminal"}
               </Button>
 
-              {/* Quick Preset Buttons for testing */}
-              <div className="pt-2 border-t border-border">
-                <p className="text-[11px] font-semibold text-muted-foreground mb-2 text-center uppercase tracking-wider">
-                  Quick Access Direct Credentials:
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickFill("trevor", "Mbugua254")}
-                    className="p-2 bg-muted/60 hover:bg-muted border border-border rounded-lg text-left text-xs transition-colors cursor-pointer"
-                  >
-                    <div className="font-bold text-foreground flex items-center gap-1">
-                      <span>Trevor (Admin)</span>
-                    </div>
-                    <div className="text-[10px] text-muted-foreground font-mono">Pass: Mbugua254</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickFill("peter", "kamaupita")}
-                    className="p-2 bg-muted/60 hover:bg-muted border border-border rounded-lg text-left text-xs transition-colors cursor-pointer"
-                  >
-                    <div className="font-bold text-foreground flex items-center gap-1">
-                      <span>Peter (Admin)</span>
-                    </div>
-                    <div className="text-[10px] text-muted-foreground font-mono">Pass: kamaupita</div>
-                  </button>
-                </div>
-                <p className="text-[10px] text-center text-muted-foreground mt-2">
-                  💡 <em>Cashier accounts created by Trevor or Peter require OTP code entry upon signing in.</em>
-                </p>
-              </div>
+              <p className="pt-2 border-t border-border text-[10px] text-center text-muted-foreground">
+                Cashier accounts require an OTP code upon signing in.
+              </p>
 
               {/* Social Login placeholders */}
               <div className="relative my-2 text-center">
@@ -394,9 +360,7 @@ export function LoginPage3({ onSuccess, onNavigateRegister, onClose, errorMessag
 
           {/* Creation Link / Info */}
           <div className="mt-5 pt-3 border-t border-border text-center text-xs text-muted-foreground">
-            <span>New cashier registration is reserved exclusively for</span>{" "}
-            <span className="font-bold text-foreground">Trevor Mbugua</span> &{" "}
-            <span className="font-bold text-foreground">Peter Kamau</span>.
+            <span>New cashier registration is reserved exclusively for administrators.</span>
           </div>
         </Card>
       </div>

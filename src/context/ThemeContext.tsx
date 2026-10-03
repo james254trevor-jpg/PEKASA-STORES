@@ -110,15 +110,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem(LOCAL_STORAGE_THEME_MODE_KEY, themeMode);
     const root = document.documentElement;
 
-    if (themeMode === 'light') {
-      root.classList.add('theme-light');
-      root.classList.remove('theme-dark');
-      root.style.colorScheme = 'light';
-    } else {
-      root.classList.add('theme-dark');
-      root.classList.remove('theme-light');
-      root.style.colorScheme = 'dark';
-    }
+    // `theme-*` drives src/theme.css; `dark` drives the shadcn tokens and Tailwind's dark: variant.
+    root.classList.toggle('theme-light', themeMode === 'light');
+    root.classList.toggle('theme-dark', themeMode === 'dark');
+    root.classList.toggle('dark', themeMode === 'dark');
+    root.dataset.theme = themeMode;
+    root.style.colorScheme = themeMode;
   }, [themeMode]);
 
   useEffect(() => {

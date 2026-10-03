@@ -5,6 +5,7 @@ import { GlobalSearch } from './GlobalSearch';
 import { CashierSessionModal } from './CashierSessionModal';
 import { STORE_NAME, STORE_MOTTO } from '../types';
 import { formatKES } from '../utils/numbering';
+import { getNavLinks, isNavLinkActive } from '../navigation';
 import { 
   Database, 
   LogOut, 
@@ -78,26 +79,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [switchError, setSwitchError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
 
-  // Role-based Nav Links
-  const navLinks = isCashier
-    ? [
-        { id: 'cashier-desk', label: 'Cashier Desk' },
-        { id: 'customers', label: 'Customers' },
-        { id: 'loans', label: 'Loans & Tickets' },
-        { id: 'collateral', label: 'Collateral Vault' },
-        { id: 'payments', label: 'Receive Payment' }
-      ]
-    : [
-        { id: 'portal', label: partnerDeskTitle, isPersonal: true },
-        { id: 'dashboard', label: 'Command Center' },
-        { id: 'loans', label: 'Rehani Loans' },
-        { id: 'collateral', label: 'Collateral Vault' },
-        { id: 'customers', label: 'Customers' },
-        { id: 'payments', label: 'Ledger' },
-        { id: 'sales', label: 'Collateral Sales' },
-        { id: 'treasury', label: 'Treasury & Expenses' },
-        { id: 'partners', label: 'Staff & Cashiers' }
-      ];
+  // Role-based nav links (shown in the left sidebar on desktop, and in the compact bar below on mobile)
+  const navLinks = getNavLinks(isCashier, partnerDeskTitle);
 
   const handleInitiateSwitch = (newUserId: string) => {
     if (newUserId === currentUser?.id) return;
@@ -108,9 +91,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   const targetUser = users.find((u) => u.id === targetUserId);
-  const isTargetPeter = targetUser?.username?.toLowerCase() === 'peter';
-  const isTargetTrevor = targetUser?.username?.toLowerCase() === 'trevor';
-  const recommendedPassword = isTargetPeter ? 'kamaupita' : isTargetTrevor ? 'Mbugua254' : '';
 
   const handleConfirmSwitch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,7 +116,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header className="sticky top-0 z-40 bg-black/80 backdrop-blur-xl border-b border-white/10 text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <div className="px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
         {/* Zone 1: Wordmark & Store Motto */}
         <div className="flex items-center gap-3 shrink-0">
           <button
@@ -158,29 +138,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </span>
         </div>
 
-        {/* Zone 2: Navigation Links */}
-        <nav className="hidden lg:flex items-center gap-2 xl:gap-3 shrink-0">
-          {navLinks.map((link) => {
-            const isActive = activeTab === link.id || (isCashier && link.id === 'cashier-desk' && activeTab === 'portal');
-            return (
-              <button
-                key={link.id}
-                onClick={() => setActiveTab(link.id)}
-                className={`text-xs xl:text-sm font-semibold tracking-wide transition-all whitespace-nowrap cursor-pointer px-3 py-1.5 rounded-xl border ${
-                  isActive
-                    ? 'bg-[#0ABAB5] text-black border-[#0ABAB5] font-extrabold shadow-lg shadow-[#0ABAB5]/20'
-                    : (link as any).isPersonal
-                    ? 'bg-white/5 text-[#0ABAB5] border-[#0ABAB5]/30 hover:bg-[#0ABAB5]/10'
-                    : 'text-slate-300 border-transparent hover:text-white hover:bg-white/5'
-                }`}
-              >
-                {link.label}
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Global Search Bar (Center / Right) */}
+        {/* Global Search Bar */}
         <div className="flex-1 max-w-xs md:max-w-sm hidden sm:block">
           <GlobalSearch
             onSelectAppliance={onSelectAppliance}
@@ -189,8 +147,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           />
         </div>
 
-        {/* Zone 3: Primary actions & Drawer widget */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Primary actions & Drawer widget */}
+        <div className="flex items-center gap-2 shrink-0 ml-auto">
           {/* Public Storefront Link */}
           {onGoToHome && (
             <button
@@ -308,7 +266,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Mobile navigation bar */}
       <div className="lg:hidden flex items-center justify-around border-t border-white/10 py-2 bg-black/80 overflow-x-auto px-2 gap-1">
         {navLinks.map((link) => {
-          const isActive = activeTab === link.id || (isCashier && link.id === 'cashier-desk' && activeTab === 'portal');
+          const isActive = isNavLinkActive(link.id, activeTab, isCashier);
           return (
             <button
               key={link.id}
@@ -394,19 +352,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </button>
                 </div>
               </div>
-
-              {recommendedPassword && (
-                <div className="p-2.5 rounded-lg bg-white/5 border border-white/10 flex items-center justify-between text-xs">
-                  <span className="text-slate-400">Default Password:</span>
-                  <button
-                    type="button"
-                    onClick={() => setPasswordInput(recommendedPassword)}
-                    className="font-mono text-[#0ABAB5] hover:underline font-bold"
-                  >
-                    Use "{recommendedPassword}"
-                  </button>
-                </div>
-              )}
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
                 <button
