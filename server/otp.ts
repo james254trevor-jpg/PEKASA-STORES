@@ -5,19 +5,26 @@
  * same code runs as a Netlify Function and a Vercel Function (see netlify/functions and api/).
  *
  * How it works (stateless):
- *   send:   generate a 6-digit code -> SMS it to the cashier's phone through Africa's Talking ->
+ *   send:   generate a 6-digit code -> SMS it to the cashier's phone (Infobip or Africa's Talking) ->
  *           return a signed token { uid, exp, nonce } + HMAC(secret, payload:code).
  *           The code itself is NEVER returned to the browser.
  *   verify: browser sends { token, code } -> we recompute the HMAC with the typed code and
  *           compare in constant time, and check expiry.
  *
  * Required environment variables:
- *   OTP_SECRET     long random string used to sign tokens
- *   AT_USERNAME    Africa's Talking username ("sandbox" for testing)
- *   AT_API_KEY     Africa's Talking API key
+ *   OTP_SECRET         long random string used to sign tokens
+ * plus ONE SMS provider (Infobip is used if both are set):
+ *   INFOBIP_BASE_URL   your Infobip API host, e.g. xxxxx.api.infobip.com
+ *   INFOBIP_API_KEY    Infobip API key
+ *   -- or --
+ *   AT_USERNAME        Africa's Talking username ("sandbox" for testing)
+ *   AT_API_KEY         Africa's Talking API key
  * Optional:
- *   AT_SENDER_ID   approved alphanumeric sender id
- *   OTP_DEV_LOG    "true" to print the code in the server log when SMS is not configured (local dev only)
+ *   INFOBIP_SENDER     sender name shown on the SMS (Infobip)
+ *   AT_SENDER_ID       approved alphanumeric sender id (Africa's Talking)
+ *   OTP_DEV_LOG        "true" to print the code in the server log when SMS is not configured (local dev only)
+ *
+ * Secrets are read from the hosting environment only and must never be committed to the repo.
  */
 
 export type Env = Record<string, string | undefined>;
@@ -86,7 +93,41 @@ export const normalizeKenyanPhone = (raw: string): string | null => {
 
 const maskPhone = (e164: string): string => e164.slice(0, 7) + '•••' + e164.slice(-3);
 
-const sendSms = async (env: Env, to: string, message: string): Promise<{ ok: boolean; error?: string }> => {
+type SmsResult = { ok: boolean; error?: string };
+
+/** Infobip: POST https://{base}/sms/2/text/advanced with "Authorization: App {key}". */
+const sendViaInfobip = async (env: Env, to: string, message: string): Promise<SmsResult> => {
+  const host = String(env.INFOBIP_BASE_URL || '').trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+  // Only ever call an Infobip host, so a mistyped setting can't send the API key somewhere else.
+  if (!/^[a-z0-9-]+\.api\.infobip\.com$/i.test(host)) return { ok: false, error: 'bad_base_url' };
+
+  const msg: Record<string, unknown> = { destinations: [{ to: to.replace(/^\+/, '') }], text: message };
+  if (env.INFOBIP_SENDER) msg.from = env.INFOBIP_SENDER;
+
+  try {
+    const res = await fetch(`https://${host}/sms/2/text/advanced`, {
+      method: 'POST',
+      headers: {
+        Authorization: `App ${env.INFOBIP_API_KEY}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json'
+      },
+      body: JSON.stringify({ messages: [msg] })
+    });
+    if (!res.ok) return { ok: false, error: `gateway_${res.status}` };
+    const data: any = await res.json().catch(() => null);
+    const group = String(data?.messages?.[0]?.status?.groupName || '');
+    // PENDING / ACCEPTED / DELIVERED are good; REJECTED / UNDELIVERABLE / EXPIRED are not.
+    if (!/^(PENDING|ACCEPTED|DELIVERED)$/i.test(group)) return { ok: false, error: 'rejected' };
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'network' };
+  }
+};
+
+const sendSms = async (env: Env, to: string, message: string): Promise<SmsResult> => {
+  if (env.INFOBIP_API_KEY && env.INFOBIP_BASE_URL) return sendViaInfobip(env, to, message);
+
   const username = env.AT_USERNAME;
   const apiKey = env.AT_API_KEY;
   if (!username || !apiKey) return { ok: false, error: 'not_configured' };
