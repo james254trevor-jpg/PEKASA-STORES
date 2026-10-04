@@ -29,6 +29,11 @@ import {
 } from 'lucide-react';
 import { STORE_NAME, STORE_TEL, STORE_TEL_ALT, STORE_MOTTO } from '../types';
 
+/** If a storefront photo fails to load, hide it so the dark tile and label remain instead of a broken-image icon. */
+const hideBrokenImage = (e: React.SyntheticEvent<HTMLImageElement>) => {
+  e.currentTarget.style.visibility = 'hidden';
+};
+
 interface PublicHomePageProps {
   onOpenPortal: () => void;
   isLoggedIn?: boolean;
@@ -375,6 +380,8 @@ export const PublicHomePage: React.FC<PublicHomePageProps> = ({ onOpenPortal, is
                   {/* Item 1: Sofa */}
                   <div className="relative group overflow-hidden rounded-2xl bg-[#1F2937] aspect-square shadow-md border border-white/10">
                     <img
+                      loading="lazy"
+                      onError={hideBrokenImage}
                       src="https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=600&q=80"
                       alt="Second hand sofa"
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
@@ -387,6 +394,8 @@ export const PublicHomePage: React.FC<PublicHomePageProps> = ({ onOpenPortal, is
                   {/* Item 2: Smart TV */}
                   <div className="relative group overflow-hidden rounded-2xl bg-[#1F2937] aspect-square shadow-md border border-white/10">
                     <img
+                      loading="lazy"
+                      onError={hideBrokenImage}
                       src="https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?auto=format&fit=crop&w=600&q=80"
                       alt="Flat screen Smart TV"
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
@@ -399,6 +408,8 @@ export const PublicHomePage: React.FC<PublicHomePageProps> = ({ onOpenPortal, is
                   {/* Item 3: Refrigerator */}
                   <div className="relative group overflow-hidden rounded-2xl bg-[#1F2937] aspect-square shadow-md border border-white/10">
                     <img
+                      loading="lazy"
+                      onError={hideBrokenImage}
                       src="https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?auto=format&fit=crop&w=600&q=80"
                       alt="Refrigerator"
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
@@ -411,6 +422,8 @@ export const PublicHomePage: React.FC<PublicHomePageProps> = ({ onOpenPortal, is
                   {/* Item 4: Sound System / Woofer */}
                   <div className="relative group overflow-hidden rounded-2xl bg-[#1F2937] aspect-square shadow-md border border-white/10">
                     <img
+                      loading="lazy"
+                      onError={hideBrokenImage}
                       src="https://images.unsplash.com/photo-1545454675-3531b543be5d?auto=format&fit=crop&w=600&q=80"
                       alt="Woofer sound system"
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
@@ -430,6 +443,8 @@ export const PublicHomePage: React.FC<PublicHomePageProps> = ({ onOpenPortal, is
                   {/* Item 6: Gas Cylinder */}
                   <div className="relative group overflow-hidden rounded-2xl bg-[#1F2937] aspect-square shadow-md border border-white/10">
                     <img
+                      loading="lazy"
+                      onError={hideBrokenImage}
                       src="https://images.unsplash.com/photo-1588854337236-6889d631faa8?auto=format&fit=crop&w=600&q=80"
                       alt="Gas Cylinder"
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
@@ -442,6 +457,8 @@ export const PublicHomePage: React.FC<PublicHomePageProps> = ({ onOpenPortal, is
                   {/* Item 7: Mattress */}
                   <div className="relative group overflow-hidden rounded-2xl bg-[#1F2937] aspect-square shadow-md border border-white/10">
                     <img
+                      loading="lazy"
+                      onError={hideBrokenImage}
                       src="https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=600&q=80"
                       alt="Mattress"
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
@@ -454,6 +471,8 @@ export const PublicHomePage: React.FC<PublicHomePageProps> = ({ onOpenPortal, is
                   {/* Item 8: Washing Machine */}
                   <div className="relative group overflow-hidden rounded-2xl bg-[#1F2937] aspect-square shadow-md border border-white/10">
                     <img
+                      loading="lazy"
+                      onError={hideBrokenImage}
                       src="https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?auto=format&fit=crop&w=600&q=80"
                       alt="Washing Machine"
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
@@ -466,6 +485,8 @@ export const PublicHomePage: React.FC<PublicHomePageProps> = ({ onOpenPortal, is
                   {/* Item 9: Cabinet / Dining */}
                   <div className="relative group overflow-hidden rounded-2xl bg-[#1F2937] aspect-square shadow-md border border-white/10">
                     <img
+                      loading="lazy"
+                      onError={hideBrokenImage}
                       src="https://images.unsplash.com/photo-1595428774223-ef52624120d2?auto=format&fit=crop&w=600&q=80"
                       alt="Cabinets and Dining"
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
@@ -606,6 +627,8 @@ export const PublicHomePage: React.FC<PublicHomePageProps> = ({ onOpenPortal, is
                   {/* Image with Tag */}
                   <div className="relative h-48 overflow-hidden bg-slate-900">
                     <img
+                      loading="lazy"
+                      onError={hideBrokenImage}
                       src={cat.img}
                       alt={cat.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
