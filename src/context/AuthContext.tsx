@@ -2,12 +2,12 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole, UserPermission, CashierSession } from '../types';
 import { sqliteService } from '../db/sqlite';
 import { verifyPassword, hashPassword, DEFAULT_SALT } from '../utils/security';
+import { sendOtp, verifyOtp } from '../utils/otpClient';
 
 export interface PendingOtpSession {
-  tempToken: string;
+  tempToken: string; // signed token issued by the server; the code itself is only ever in the SMS
   user: User;
-  otpCode: string;
-  contactInfo: string;
+  contactInfo: string; // masked phone number, safe to display
   expiresAt: number;
 }
 
@@ -16,7 +16,6 @@ export interface RequestLoginResult {
   success?: boolean;
   tempToken?: string;
   contactInfo?: string;
-  demoOtp?: string;
   error?: string;
 }
 
@@ -161,34 +160,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const userIsCashier = user.role_id === 'role-cashier' && user.username !== 'trevor' && user.username !== 'peter';
 
     if (userIsCashier) {
-      // 6-digit OTP
-      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-      const tempToken = 'otp-' + Date.now() + '-' + Math.floor(Math.random() * 10000);
-      const contact = user.phone || user.email || 'counter phone';
+      // The server generates the 6-digit code and texts it to the cashier's phone number.
+      const sent = await sendOtp(user.id, user.phone, user.full_name);
+      if (!sent.ok || !sent.token) {
+        const msg = sent.error || 'Could not send the verification code. Please try again.';
+        setLoginError(msg);
+        return { requireOtp: false, error: msg };
+      }
 
-      const sessionData: PendingOtpSession = {
-        tempToken,
+      const contact = sent.maskedPhone || 'your phone';
+      setPendingOtp({
+        tempToken: sent.token,
         user,
-        otpCode,
         contactInfo: contact,
-        expiresAt: Date.now() + 10 * 60 * 1000 // 10 minutes
-      };
-      setPendingOtp(sessionData);
+        expiresAt: Date.now() + 10 * 60 * 1000 // 10 minutes (enforced by the server too)
+      });
 
       sqliteService.logAudit(
         user.full_name,
         'OTP_DISPATCH',
         'USER',
         user.id,
-        `Generated 6-digit counter login OTP code dispatched to ${contact}`
+        `6-digit counter login OTP sent by SMS to ${contact}`
       );
 
-      return {
-        requireOtp: true,
-        tempToken,
-        contactInfo: contact,
-        demoOtp: otpCode
-      };
+      return { requireOtp: true, tempToken: sent.token, contactInfo: contact };
     }
 
     // Admin direct sign-in (Trevor or Peter)
@@ -218,8 +214,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, error: 'OTP code expired. Please request a new verification code.' };
     }
 
-    if (pendingOtp.otpCode.trim() !== otpCode.trim()) {
-      return { success: false, error: 'Invalid OTP code. Please enter the 6-digit code received.' };
+    // The server checks the code against the signed token
+    const result = await verifyOtp(tempToken, otpCode);
+    if (!result.ok || result.userId !== pendingOtp.user.id) {
+      return { success: false, error: result.error || 'Invalid OTP code. Please enter the 6-digit code received.' };
     }
 
     // OTP Verified! Log in the Cashier

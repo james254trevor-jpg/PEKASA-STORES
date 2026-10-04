@@ -65,7 +65,6 @@ export function LoginPage3({ onSuccess, onNavigateRegister, onClose, errorMessag
   const [step, setStep] = useState<"credentials" | "otp">("credentials");
   const [tempToken, setTempToken] = useState("");
   const [contactInfo, setContactInfo] = useState("");
-  const [dispatchedOtp, setDispatchedOtp] = useState("");
   const [otpInput, setOtpInput] = useState("");
 
   const handleSubmitCredentials = async (e: React.FormEvent) => {
@@ -81,7 +80,6 @@ export function LoginPage3({ onSuccess, onNavigateRegister, onClose, errorMessag
         setStep("otp");
         setTempToken(res.tempToken || "");
         setContactInfo(res.contactInfo || "");
-        setDispatchedOtp(res.demoOtp || "");
       } else if (res.success) {
         // Direct login for Admin
         if (onSuccess) {
@@ -151,7 +149,7 @@ export function LoginPage3({ onSuccess, onNavigateRegister, onClose, errorMessag
             </h1>
             <p className="text-muted-foreground text-center text-xs">
               {step === 'otp'
-                ? `Enter the 6-digit OTP code dispatched to ${contactInfo}`
+                ? `Enter the 6-digit code we sent by SMS to ${contactInfo}`
                 : 'Role-Based Authentication for Administrators & Counter Cashiers'}
             </p>
           </div>
@@ -274,29 +272,15 @@ export function LoginPage3({ onSuccess, onNavigateRegister, onClose, errorMessag
           ) : (
             /* STEP 2: OTP VERIFICATION FOR CASHIER */
             <form className="flex flex-col gap-5" onSubmit={handleVerifyOtp}>
-              {/* Simulated OTP Notification Banner */}
+              {/* The code is only delivered to the cashier's phone by SMS, never shown here */}
               <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-1.5 text-xs text-amber-900 dark:text-amber-200">
                 <div className="flex items-center gap-1.5 font-bold">
                   <Smartphone className="w-4 h-4 text-amber-500 animate-pulse" />
-                  <span>SMS & Email OTP Dispatched</span>
+                  <span>Code sent by SMS</span>
                 </div>
                 <p className="text-[11px] leading-relaxed">
-                  A 6-digit one-time code was sent to <strong>{contactInfo}</strong>.
+                  A 6-digit one-time code was sent to <strong>{contactInfo}</strong>. Check your phone and enter it below.
                 </p>
-                {dispatchedOtp && (
-                  <div className="mt-2 p-2 bg-amber-500/20 rounded border border-amber-500/30 flex items-center justify-between">
-                    <span className="font-mono text-sm font-extrabold tracking-widest text-amber-600 dark:text-amber-300">
-                      OTP: {dispatchedOtp}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setOtpInput(dispatchedOtp)}
-                      className="px-2 py-0.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded text-[11px] transition-colors cursor-pointer"
-                    >
-                      Fill Code
-                    </button>
-                  </div>
-                )}
               </div>
 
               <div className="space-y-1">
@@ -345,9 +329,13 @@ export function LoginPage3({ onSuccess, onNavigateRegister, onClose, errorMessag
                   onClick={async () => {
                     setLocalError(null);
                     const res = await requestLogin(email, password);
-                    if (res.demoOtp) {
-                      setDispatchedOtp(res.demoOtp);
-                      alert(`A new OTP has been dispatched to ${contactInfo}: ${res.demoOtp}`);
+                    if (res.requireOtp) {
+                      setTempToken(res.tempToken || "");
+                      setContactInfo(res.contactInfo || "");
+                      setOtpInput("");
+                      setLocalError(null);
+                    } else if (res.error) {
+                      setLocalError(res.error);
                     }
                   }}
                   className="text-xs text-primary font-semibold underline underline-offset-2 hover:text-primary/80 cursor-pointer"
