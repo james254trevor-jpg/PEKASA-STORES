@@ -32,7 +32,15 @@ import {
   Coins
 } from 'lucide-react';
 
-export const PartnersView: React.FC = () => {
+interface PartnersViewProps {
+  activeSubTab?: 'financials' | 'cashiers' | 'sessions' | 'voids' | 'expenses' | 'technicians' | 'suppliers' | 'audit' | 'network';
+  onSubTabChange?: (tab: 'financials' | 'cashiers' | 'sessions' | 'voids' | 'expenses' | 'technicians' | 'suppliers' | 'audit' | 'network') => void;
+}
+
+export const PartnersView: React.FC<PartnersViewProps> = ({ 
+  activeSubTab: externalSubTab,
+  onSubTabChange 
+}) => {
   const { 
     currentUser, 
     users, 
@@ -53,9 +61,15 @@ export const PartnersView: React.FC = () => {
   const sessions = sqliteService.getCashierSessions();
   const voidRequests = sqliteService.getPaymentVoidRequests();
 
-  const [activeSubTab, setActiveSubTab] = useState<
+  const [internalSubTab, setInternalSubTab] = useState<
     'financials' | 'cashiers' | 'sessions' | 'voids' | 'expenses' | 'technicians' | 'suppliers' | 'audit' | 'network'
   >('cashiers');
+
+  const activeSubTab = externalSubTab || internalSubTab;
+  const setActiveSubTab = (tab: any) => {
+    setInternalSubTab(tab);
+    if (onSubTabChange) onSubTabChange(tab);
+  };
 
   // New Expense Form State
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);

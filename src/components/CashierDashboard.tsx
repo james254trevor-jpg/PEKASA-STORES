@@ -97,12 +97,15 @@ export const CashierDashboard: React.FC<CashierDashboardProps> = ({
       <div className="p-5 bg-gradient-to-r from-[#0B2D4A] via-[#0F3B60] to-[#0B2D4A] border border-[#FFD700]/30 rounded-2xl text-white shadow-xl shadow-[#0B2D4A]/20">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {currentUser?.avatar_url && (
+                <img src={currentUser.avatar_url} alt="" className="w-6 h-6 rounded-md object-cover border border-[#FFD700]/50 shadow-sm" />
+              )}
               <span className="text-[11px] font-mono uppercase tracking-wider text-[#FFD700] bg-[#FFD700]/10 border border-[#FFD700]/30 px-2.5 py-0.5 rounded-full font-bold">
                 Counter Cashier Terminal
               </span>
               <span className="text-xs text-slate-300">
-                Operator: <strong className="text-white">{currentUser?.full_name || 'Cashier'}</strong>
+                Operator: <strong className="text-white">{currentUser?.full_name || 'Cashier'}</strong> ({currentUser?.role_title || 'Staff'})
               </span>
             </div>
             <h2 className="text-xl md:text-2xl font-black tracking-tight text-white mt-1">

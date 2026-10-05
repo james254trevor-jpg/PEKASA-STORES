@@ -25,7 +25,8 @@ import {
   AuditLog,
   CashierSession,
   PaymentVoidRequest,
-  DEFAULT_LTV_CONFIGS
+  DEFAULT_LTV_CONFIGS,
+  BusinessSettings
 } from '../types';
 import { hashPassword, DEFAULT_SALT } from '../utils/security';
 import { formatSequenceCode, calculateLoanDueDate, calculateMaturityDate } from '../utils/numbering';
@@ -502,12 +503,51 @@ class SQLiteService {
 
       // Add missing columns if upgrading
       try { this.db.run('ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1;'); } catch {}
+      try { this.db.run('ALTER TABLE users ADD COLUMN avatar_url TEXT;'); } catch {}
+      try { this.db.run('ALTER TABLE users ADD COLUMN address TEXT;'); } catch {}
+      try { this.db.run('ALTER TABLE users ADD COLUMN notes TEXT;'); } catch {}
+      try { this.db.run('ALTER TABLE users ADD COLUMN appearance_theme TEXT;'); } catch {}
+      try { this.db.run('ALTER TABLE users ADD COLUMN notification_preferences TEXT;'); } catch {}
+      try { this.db.run('ALTER TABLE users ADD COLUMN two_factor_enabled INTEGER DEFAULT 0;'); } catch {}
       try { this.db.run('ALTER TABLE customers ADD COLUMN customer_number TEXT;'); } catch {}
       try { this.db.run('ALTER TABLE customers ADD COLUMN alt_phone TEXT;'); } catch {}
       try { this.db.run('ALTER TABLE customers ADD COLUMN county TEXT;'); } catch {}
       try { this.db.run('ALTER TABLE customers ADD COLUMN id_photo_url TEXT;'); } catch {}
       try { this.db.run('ALTER TABLE customers ADD COLUMN status TEXT DEFAULT "Good Standing";'); } catch {}
       try { this.db.run('ALTER TABLE customers ADD COLUMN defaults_count INTEGER DEFAULT 0;'); } catch {}
+
+      // Business settings table
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS business_settings (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+      `);
+
+      // Seed business settings if not present
+      const existingSettings = this.query<{ key: string }>('SELECT key FROM business_settings LIMIT 1');
+      if (!existingSettings || existingSettings.length === 0) {
+        const defaults: Record<string, string> = {
+          business_name: 'PEKASA STORES',
+          business_motto: 'We buy and sell used second hand goods, cash against furnitures, fridges, TVs, Woofers, Gas cylinders, Mattress Etc.',
+          business_phone: '0727108749',
+          business_phone_alt: '0180366344',
+          business_email: 'info@pekasastores.co.ke',
+          business_address: 'Kombani Commercial Centre, Kwale County, along Kwale-Likoni Road',
+          currency: 'KES',
+          tax_rate: '0',
+          tax_enabled: 'false',
+          receipt_footer: 'Directors: Trevor & Peter | Kombani, Kwale · Open 6 Days',
+          invoice_prefix: 'INV',
+          receipt_prefix: 'RCT',
+          session_timeout_minutes: '30'
+        };
+        const now = new Date().toISOString();
+        for (const [k, v] of Object.entries(defaults)) {
+          this.db.run('INSERT OR IGNORE INTO business_settings (key, value, updated_at) VALUES (?, ?, ?)', [k, v, now]);
+        }
+      }
 
     } catch (e) {
       console.warn('ensureSchema upgrade warning:', e);
@@ -1505,6 +1545,118 @@ class SQLiteService {
     }));
   }
 
+  public updateUserProfile(userId: string, data: Partial<User>): void {
+    const fields: string[] = [];
+    const values: any[] = [];
+    
+    if (data.full_name !== undefined) { fields.push('full_name = ?'); values.push(data.full_name); }
+    if (data.email !== undefined) { fields.push('email = ?'); values.push(data.email); }
+    if (data.phone !== undefined) { fields.push('phone = ?'); values.push(data.phone); }
+    if (data.avatar_url !== undefined) { fields.push('avatar_url = ?'); values.push(data.avatar_url); }
+    if (data.address !== undefined) { fields.push('address = ?'); values.push(data.address); }
+    if (data.notes !== undefined) { fields.push('notes = ?'); values.push(data.notes); }
+    if (data.appearance_theme !== undefined) { fields.push('appearance_theme = ?'); values.push(data.appearance_theme); }
+    if (data.notification_preferences !== undefined) { fields.push('notification_preferences = ?'); values.push(data.notification_preferences); }
+    if (data.two_factor_enabled !== undefined) { fields.push('two_factor_enabled = ?'); values.push(data.two_factor_enabled ? 1 : 0); }
+
+    if (fields.length === 0) return;
+    values.push(userId);
+    this.run(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values);
+    this.persist();
+  }
+
+  public updateUserPassword(userId: string, hash: string, salt: string): void {
+    this.run('UPDATE users SET password_hash = ?, salt = ? WHERE id = ?', [hash, salt, userId]);
+    this.persist();
+  }
+
+  // --- Business Settings ---
+  public getBusinessSettings(): BusinessSettings {
+    try {
+      const rows = this.query<{ key: string; value: string }>('SELECT key, value FROM business_settings');
+      const map: Record<string, string> = {};
+      rows.forEach((r) => { map[r.key] = r.value; });
+
+      return {
+        business_name: map['business_name'] || 'PEKASA STORES',
+        business_motto: map['business_motto'] || 'We buy and sell used second hand goods, cash against furnitures, fridges, TVs, Woofers, Gas cylinders, Mattress Etc.',
+        business_phone: map['business_phone'] || '0727108749',
+        business_phone_alt: map['business_phone_alt'] || '0180366344',
+        business_email: map['business_email'] || 'info@pekasastores.co.ke',
+        business_address: map['business_address'] || 'Kombani Commercial Centre, Kwale County, along Kwale-Likoni Road',
+        currency: map['currency'] || 'KES',
+        tax_rate: Number(map['tax_rate']) || 0,
+        tax_enabled: map['tax_enabled'] === 'true',
+        receipt_footer: map['receipt_footer'] || 'Directors: Trevor & Peter | Kombani, Kwale · Open 6 Days',
+        invoice_prefix: map['invoice_prefix'] || 'INV',
+        receipt_prefix: map['receipt_prefix'] || 'RCT',
+        session_timeout_minutes: Number(map['session_timeout_minutes']) || 30,
+        logo_url: map['logo_url'] || ''
+      };
+    } catch {
+      return {
+        business_name: 'PEKASA STORES',
+        business_motto: 'We buy and sell used second hand goods, cash against furnitures, fridges, TVs, Woofers, Gas cylinders, Mattress Etc.',
+        business_phone: '0727108749',
+        business_phone_alt: '0180366344',
+        business_email: 'info@pekasastores.co.ke',
+        business_address: 'Kombani Commercial Centre, Kwale County, along Kwale-Likoni Road',
+        currency: 'KES',
+        tax_rate: 0,
+        tax_enabled: false,
+        receipt_footer: 'Directors: Trevor & Peter | Kombani, Kwale · Open 6 Days',
+        invoice_prefix: 'INV',
+        receipt_prefix: 'RCT',
+        session_timeout_minutes: 30,
+        logo_url: ''
+      };
+    }
+  }
+
+  public saveBusinessSettings(settings: Partial<BusinessSettings>): void {
+    const now = new Date().toISOString();
+    for (const [k, v] of Object.entries(settings)) {
+      if (v !== undefined) {
+        this.run(
+          'INSERT OR REPLACE INTO business_settings (key, value, updated_at) VALUES (?, ?, ?)',
+          [k, String(v), now]
+        );
+      }
+    }
+    this.persist();
+  }
+
+  public getDatabaseStats(): {
+    totalTables: number;
+    totalRows: number;
+    recordCounts: Record<string, number>;
+  } {
+    const tables = [
+      'users', 'customers', 'collateral_items', 'rehani_loans', 'loan_renewals',
+      'ledger_transactions', 'operating_expenses', 'treasury', 'cashier_sessions',
+      'audit_logs', 'suppliers', 'inventory_parts'
+    ];
+    const recordCounts: Record<string, number> = {};
+    let totalRows = 0;
+
+    for (const t of tables) {
+      try {
+        const res = this.query<{ cnt: number }>(`SELECT COUNT(*) as cnt FROM ${t}`);
+        const cnt = res[0]?.cnt || 0;
+        recordCounts[t] = cnt;
+        totalRows += cnt;
+      } catch {
+        recordCounts[t] = 0;
+      }
+    }
+
+    return {
+      totalTables: tables.length,
+      totalRows,
+      recordCounts
+    };
+  }
+
   // --- Cashier Daily Sessions ---
   public getCashierSessions(cashierId?: string): CashierSession[] {
     const clause = cashierId ? `WHERE cashier_id = '${cashierId}'` : '';
@@ -2132,6 +2284,27 @@ class SQLiteService {
     const SQL = await initSqlAsm();
     this.db = new SQL.Database();
     await this.createInitialSchemaAndSeed();
+    await this.persist();
+    this.notify();
+  }
+
+  public async clearOperationalDataAdmin(preserveAdminUsers: boolean = true): Promise<void> {
+    if (!this.db) return;
+    this.run('DELETE FROM loan_renewals;');
+    this.run('DELETE FROM ledger_transactions;');
+    this.run('DELETE FROM rehani_loans;');
+    this.run('DELETE FROM collateral_items;');
+    this.run('DELETE FROM customers;');
+    this.run('DELETE FROM operating_expenses;');
+    this.run('DELETE FROM collateral_sales;');
+    this.run('DELETE FROM stock_movements;');
+    this.run('DELETE FROM cashier_sessions;');
+    try { this.run('DELETE FROM payment_void_requests;'); } catch {}
+    if (!preserveAdminUsers) {
+      this.run("DELETE FROM users WHERE username NOT IN ('trevor', 'peter');");
+    }
+    this.run("UPDATE treasury SET cash_in_vault = 0, mpesa_till_balance = 0, bank_balance = 0, trevor_capital = 0, peter_capital = 0, retained_profit = 0 WHERE id = 'trs-main';");
+    this.run("INSERT INTO audit_logs (id, user_name, action, entity_type, entity_id, details, created_at) VALUES ('aud-' || hex(randomblob(6)), 'Admin', 'DATA_RESET', 'DATABASE', 'ALL', 'Operational data cleared by authorized administrator.', datetime('now'));");
     await this.persist();
     this.notify();
   }

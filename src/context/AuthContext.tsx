@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, UserRole, UserPermission, CashierSession } from '../types';
+import { User, UserRole, UserPermission, CashierSession, BusinessSettings } from '../types';
 import { sqliteService } from '../db/sqlite';
 import { verifyPassword, hashPassword, DEFAULT_SALT } from '../utils/security';
 
@@ -28,8 +28,16 @@ interface AuthContextType {
   isLoading: boolean;
   loginError: string | null;
   isAdmin: boolean;
+  isManager: boolean;
   isCashier: boolean;
+  isTechnician: boolean;
   isPrimaryAdmin: boolean;
+  businessSettings: BusinessSettings;
+  updateBusinessSettings: (settings: Partial<BusinessSettings>) => Promise<void>;
+  updateUserProfile: (data: Partial<User>) => Promise<{ success: boolean; error?: string }>;
+  changeUserPassword: (oldPass: string, newPass: string) => Promise<{ success: boolean; error?: string }>;
+  updateUserPreferences: (prefs: { appearance_theme?: string; notification_preferences?: string; two_factor_enabled?: boolean }) => Promise<void>;
+  clearOperationalDataAdmin: (preserveAdminUsers?: boolean) => Promise<void>;
   activeCashierSession: CashierSession | null;
   pendingOtp: PendingOtpSession | null;
   login: (username: string, password: string) => Promise<boolean>;
@@ -122,9 +130,69 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshActiveSession();
   }, [currentUser]);
 
-  const isAdmin = currentUser?.role_id === 'role-admin' || currentUser?.username === 'trevor' || currentUser?.username === 'peter';
-  const isCashier = currentUser?.role_id === 'role-cashier';
-  const isPrimaryAdmin = currentUser?.username === 'trevor' || currentUser?.username === 'peter';
+  const isAdmin = !!(currentUser?.role_id === 'role-admin' || currentUser?.username === 'trevor' || currentUser?.username === 'peter');
+  const isManager = !!(currentUser?.role_id === 'role-manager' || currentUser?.role_title?.toLowerCase().includes('manager'));
+  const isCashier = !!(currentUser?.role_id === 'role-cashier');
+  const isTechnician = !!(currentUser?.role_id === 'role-technician' || currentUser?.role_title?.toLowerCase().includes('technician'));
+  const isPrimaryAdmin = !!(currentUser?.username === 'trevor' || currentUser?.username === 'peter');
+
+  const [businessSettings, setBusinessSettings] = useState<BusinessSettings>(() => sqliteService.getBusinessSettings());
+
+  const updateBusinessSettings = async (newSettings: Partial<BusinessSettings>) => {
+    sqliteService.saveBusinessSettings(newSettings);
+    setBusinessSettings(sqliteService.getBusinessSettings());
+  };
+
+  const updateUserProfile = async (data: Partial<User>): Promise<{ success: boolean; error?: string }> => {
+    if (!currentUser) return { success: false, error: 'No user logged in' };
+    try {
+      sqliteService.updateUserProfile(currentUser.id, data);
+      const updatedUser = sqliteService.getUsers().find((u) => u.id === currentUser.id);
+      if (updatedUser) {
+        setCurrentUser(updatedUser);
+      }
+      loadData();
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to update profile' };
+    }
+  };
+
+  const changeUserPassword = async (oldPass: string, newPass: string): Promise<{ success: boolean; error?: string }> => {
+    if (!currentUser) return { success: false, error: 'No user logged in' };
+    if (!newPass || newPass.trim().length < 4) {
+      return { success: false, error: 'New password must be at least 4 characters long.' };
+    }
+    const isValid = await verifyPassword(oldPass, currentUser.password_hash, currentUser.salt || DEFAULT_SALT);
+    if (!isValid) {
+      return { success: false, error: 'Current password is incorrect.' };
+    }
+    try {
+      const newHash = await hashPassword(newPass.trim(), currentUser.salt || DEFAULT_SALT);
+      sqliteService.updateUserPassword(currentUser.id, newHash, currentUser.salt || DEFAULT_SALT);
+      const updatedUser = sqliteService.getUsers().find((u) => u.id === currentUser.id);
+      if (updatedUser) {
+        setCurrentUser(updatedUser);
+      }
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to update password' };
+    }
+  };
+
+  const updateUserPreferences = async (prefs: { appearance_theme?: string; notification_preferences?: string; two_factor_enabled?: boolean }) => {
+    if (!currentUser) return;
+    sqliteService.updateUserProfile(currentUser.id, prefs);
+    const updatedUser = sqliteService.getUsers().find((u) => u.id === currentUser.id);
+    if (updatedUser) {
+      setCurrentUser(updatedUser);
+    }
+  };
+
+  const clearOperationalDataAdmin = async (preserveAdminUsers: boolean = true) => {
+    await sqliteService.clearOperationalDataAdmin(preserveAdminUsers);
+    loadData();
+  };
 
   // Request login: handles OTP trigger for Cashiers vs direct entry for Admins
   const requestLogin = async (identifier: string, pass: string): Promise<RequestLoginResult> => {
@@ -421,8 +489,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         loginError,
         isAdmin,
+        isManager,
         isCashier,
+        isTechnician,
         isPrimaryAdmin,
+        businessSettings,
+        updateBusinessSettings,
+        updateUserProfile,
+        changeUserPassword,
+        updateUserPreferences,
+        clearOperationalDataAdmin,
         activeCashierSession,
         pendingOtp,
         login,

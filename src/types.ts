@@ -31,9 +31,56 @@ export interface User {
   is_active?: boolean;
   created_at: string;
   last_login: string | null;
+  avatar_url?: string;
+  address?: string;
+  notes?: string;
+  appearance_theme?: string;
+  notification_preferences?: string;
+  two_factor_enabled?: boolean;
 }
 
-export type RoleType = 'ADMIN' | 'CASHIER';
+export type RoleType = 'ADMIN' | 'MANAGER' | 'CASHIER' | 'TECHNICIAN';
+
+export interface BusinessSettings {
+  business_name: string;
+  business_motto: string;
+  business_phone: string;
+  business_phone_alt: string;
+  business_email: string;
+  business_address: string;
+  currency: string;
+  tax_rate: number;
+  tax_enabled: boolean;
+  receipt_footer: string;
+  invoice_prefix: string;
+  receipt_prefix: string;
+  session_timeout_minutes: number;
+  logo_url?: string;
+}
+
+export interface NotificationSettings {
+  low_stock_alerts: boolean;
+  new_customer_alerts: boolean;
+  new_sales_alerts: boolean;
+  payment_alerts: boolean;
+  system_alerts: boolean;
+  browser_notifications: boolean;
+  sound_alerts: boolean;
+}
+
+export interface CustomThemeConfig {
+  themeMode: 'dark' | 'light' | 'system';
+  primaryColor: string;
+  secondaryColor: string;
+  backgroundColor?: string;
+  sidebarColor?: string;
+  buttonColor?: string;
+  textColor?: string;
+  presetName?: string;
+  sidebarStyle: 'standard' | 'compact' | 'glass';
+  density: 'comfortable' | 'compact';
+  fontSize: 'normal' | 'small' | 'large';
+}
 
 export interface CashierSession {
   id: string;

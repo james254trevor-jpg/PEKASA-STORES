@@ -10,7 +10,9 @@ import {
   BookOpen,
   Tag,
   Landmark,
-  UserCog
+  UserCog,
+  Settings,
+  User
 } from 'lucide-react';
 
 export interface NavLink {
@@ -31,7 +33,9 @@ export const getNavLinks = (isCashier: boolean, partnerDeskTitle: string): NavLi
         { id: 'customers', label: 'Customers', icon: Users },
         { id: 'loans', label: 'Loans & Tickets', icon: FileText },
         { id: 'collateral', label: 'Collateral Vault', icon: Package },
-        { id: 'payments', label: 'Receive Payment', icon: Receipt }
+        { id: 'payments', label: 'Receive Payment', icon: Receipt },
+        { id: 'profile', label: 'My Profile', icon: User },
+        { id: 'settings', label: 'Settings', icon: Settings }
       ]
     : [
         { id: 'portal', label: partnerDeskTitle, icon: Home, isPersonal: true },
@@ -42,7 +46,8 @@ export const getNavLinks = (isCashier: boolean, partnerDeskTitle: string): NavLi
         { id: 'payments', label: 'Ledger', icon: BookOpen },
         { id: 'sales', label: 'Collateral Sales', icon: Tag },
         { id: 'treasury', label: 'Treasury & Expenses', icon: Landmark },
-        { id: 'partners', label: 'Staff & Cashiers', icon: UserCog }
+        { id: 'partners', label: 'Staff & Cashiers', icon: UserCog },
+        { id: 'settings', label: 'Settings', icon: Settings }
       ];
 
 export const isNavLinkActive = (

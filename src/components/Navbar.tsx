@@ -28,7 +28,18 @@ import {
   Moon,
   Palette,
   Coins,
-  DollarSign
+  DollarSign,
+  ChevronDown,
+  User,
+  Settings,
+  Shield,
+  UserCog,
+  Users,
+  Wrench,
+  Truck,
+  Clock,
+  Receipt,
+  Smartphone
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -40,6 +51,10 @@ interface NavbarProps {
   onSearchInTab: (tab: string, query: string) => void;
   onOpenAddCustomerWithItems?: () => void;
   onGoToHome?: () => void;
+  onNavigateToSettingsSection?: (section: string) => void;
+  activeStaffSubTab?: string;
+  onSelectStaffSubTab?: (subTab: string) => void;
+  onToggleMobileMode?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -50,7 +65,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSelectCustomer,
   onSearchInTab,
   onOpenAddCustomerWithItems,
-  onGoToHome
+  onGoToHome,
+  onNavigateToSettingsSection,
+  activeStaffSubTab,
+  onSelectStaffSubTab,
+  onToggleMobileMode
 }) => {
   const { 
     currentUser, 
@@ -70,6 +89,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const partnerDeskTitle = isTrevor ? "Trevor's Desk" : "Peter's Desk";
 
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   // Password verification modal state for switching accounts
   const [isSwitchModalOpen, setIsSwitchModalOpen] = useState(false);
@@ -222,6 +242,128 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </button>
 
+          {/* Quick Mobile View Switcher */}
+          {onToggleMobileMode && (
+            <button
+              onClick={onToggleMobileMode}
+              title="Switch to Mobile Phone View"
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-300 bg-white/5 hover:bg-white/10 border border-white/15 rounded-xl transition-all cursor-pointer"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-[#0ABAB5]" />
+              <span className="hidden xl:inline">Mobile UI</span>
+            </button>
+          )}
+
+          {/* User Profile Avatar Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+              className="flex items-center gap-2 p-1.5 pr-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 transition-all cursor-pointer"
+              title="User Account & Settings Menu"
+            >
+              <div className="w-7 h-7 rounded-lg bg-slate-800 border border-white/20 flex items-center justify-center text-xs font-bold text-white overflow-hidden shrink-0">
+                {currentUser?.avatar_url ? (
+                  <img src={currentUser.avatar_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-[#0ABAB5] font-black">{currentUser?.full_name?.charAt(0) || 'U'}</span>
+                )}
+              </div>
+              <span className="text-xs font-bold text-white hidden sm:inline max-w-[120px] truncate">
+                {currentUser?.full_name?.split(' ')[0]}
+              </span>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+
+            {/* Dropdown Menu */}
+            {isUserMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setIsUserMenuOpen(false)} />
+                <div className="absolute right-0 top-full mt-2 w-56 bg-slate-900 border border-white/15 rounded-2xl shadow-2xl p-2 z-50 text-xs space-y-1 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100">
+                  <div className="px-3 py-2 border-b border-white/10">
+                    <div className="font-bold text-white truncate">{currentUser?.full_name}</div>
+                    <div className="text-[10px] text-slate-400 flex items-center justify-between mt-0.5">
+                      <span>@{currentUser?.username}</span>
+                      <span className="text-[#0ABAB5] font-bold">{currentUser?.role_title}</span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      setActiveTab('profile');
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 text-left transition-colors cursor-pointer"
+                  >
+                    <User className="w-3.5 h-3.5 text-[#0ABAB5]" />
+                    <span>My Profile</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      if (onNavigateToSettingsSection) onNavigateToSettingsSection('appearance');
+                      setActiveTab('settings');
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 text-left transition-colors cursor-pointer"
+                  >
+                    <Palette className="w-3.5 h-3.5 text-[#FFD700]" />
+                    <span>Appearance & Theme</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      if (onNavigateToSettingsSection) onNavigateToSettingsSection('account');
+                      setActiveTab('settings');
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 text-left transition-colors cursor-pointer"
+                  >
+                    <Settings className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Settings</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      if (onNavigateToSettingsSection) onNavigateToSettingsSection('security');
+                      setActiveTab('settings');
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 text-left transition-colors cursor-pointer"
+                  >
+                    <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Security & Sessions</span>
+                  </button>
+
+                  {onToggleMobileMode && (
+                    <button
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        onToggleMobileMode();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 text-left transition-colors cursor-pointer"
+                    >
+                      <Smartphone className="w-3.5 h-3.5 text-[#0ABAB5]" />
+                      <span>Switch to Mobile View</span>
+                    </button>
+                  )}
+
+                  <div className="border-t border-white/10 pt-1">
+                    <button
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        logout();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-rose-400 hover:bg-rose-500/10 text-left transition-colors cursor-pointer font-bold"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Lock Terminal / Logout</span>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
           {/* User Duty Switcher */}
           <div className="flex items-center bg-black/60 border border-white/15 rounded-xl p-1 shadow-inner">
             <span className="text-[11px] text-slate-400 pl-2 pr-1 hidden xl:inline font-mono">Duty:</span>
@@ -242,17 +384,45 @@ export const Navbar: React.FC<NavbarProps> = ({
               ))}
             </select>
           </div>
-
-          {/* Logout */}
-          <button
-            onClick={logout}
-            title="Lock terminal"
-            className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 rounded-xl transition-colors cursor-pointer"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
         </div>
       </div>
+
+      {/* SECONDARY SUB-NAVIGATION BAR FOR STAFF & CASHIERS */}
+      {activeTab === 'partners' && (
+        <div className="bg-slate-900/95 border-b border-white/10 px-4 sm:px-6 lg:px-8 py-2 overflow-x-auto flex items-center gap-2 text-xs no-scrollbar">
+          <span className="text-[10px] font-black uppercase tracking-wider text-[#FFD700] flex items-center gap-1.5 shrink-0 pr-2 border-r border-white/10">
+            <UserCog className="w-3.5 h-3.5" />
+            <span>Staff Portal:</span>
+          </span>
+          {[
+            { id: 'cashiers', label: 'Cashier Accounts & Roles', icon: Users },
+            { id: 'sessions', label: 'Cashier Sessions & Drawers', icon: Coins },
+            { id: 'voids', label: 'Reconciliations & Voids', icon: AlertTriangle },
+            { id: 'financials', label: 'Partner Capital & Shares', icon: DollarSign },
+            { id: 'technicians', label: 'Technicians & Hardware', icon: Wrench },
+            { id: 'expenses', label: 'Operating Expenses', icon: Receipt },
+            { id: 'suppliers', label: 'Suppliers Directory', icon: Truck },
+            { id: 'audit', label: 'Security & Audit Logs', icon: Clock }
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isSubActive = (activeStaffSubTab || 'cashiers') === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => onSelectStaffSubTab && onSelectStaffSubTab(tab.id)}
+                className={`px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer ${
+                  isSubActive
+                    ? 'bg-[#0ABAB5] text-black shadow-md shadow-[#0ABAB5]/20 font-black'
+                    : 'bg-white/5 text-slate-300 hover:text-white hover:bg-white/10 border border-white/10'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5 shrink-0" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Mobile Global Search Bar */}
       <div className="sm:hidden px-4 pb-2.5">

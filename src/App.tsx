@@ -19,10 +19,13 @@ import { BackupRestoreModal } from './components/BackupRestoreModal';
 import { ThemeSettingsPanel } from './components/ThemeSettingsPanel';
 import { AddCustomerWithItemsModal } from './components/AddCustomerWithItemsModal';
 import { PublicHomePage } from './components/PublicHomePage';
+import { UserProfileView } from './components/UserProfileView';
+import { SettingsView } from './components/SettingsView';
+import { MobileApp } from './components/mobile/MobileApp';
 import LoginPage1 from '@/components/ui/login-page-1';
 import { Appliance, STORE_NAME, STORE_MOTTO } from './types';
 import { CashierDashboard } from './components/CashierDashboard';
-import { Database, HardDrive, Shield, Sun, Moon, Palette, AlertTriangle } from 'lucide-react';
+import { Database, HardDrive, Shield, Sun, Moon, Palette, AlertTriangle, Smartphone, Laptop } from 'lucide-react';
 
 const MainApp: React.FC = () => {
   const { currentUser, isLoading, login, loginError, isAdmin, isCashier } = useAuth();
@@ -53,6 +56,47 @@ const MainApp: React.FC = () => {
   const [applianceSearchQuery, setApplianceSearchQuery] = useState<string>('');
   const [customerSearchQuery, setCustomerSearchQuery] = useState<string>('');
   const [applianceForPayment, setApplianceForPayment] = useState<Appliance | null>(null);
+
+  // Sub-navigation state for Staff & Cashiers secondary bar
+  const [activeStaffSubTab, setActiveStaffSubTab] = useState<any>('cashiers');
+  // Section state for Settings page
+  const [settingsSection, setSettingsSection] = useState<string>('appearance');
+
+  // Mobile View vs Desktop View management (defaults to auto based on viewport < 1024px)
+  const [preferredViewMode, setPreferredViewMode] = useState<'auto' | 'mobile' | 'desktop'>(() => {
+    try {
+      const saved = localStorage.getItem('pekasa_view_mode');
+      if (saved === 'mobile' || saved === 'desktop') return saved;
+    } catch {}
+    return 'auto';
+  });
+
+  const [isMobileScreen, setIsMobileScreen] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 1024;
+    }
+    return false;
+  });
+
+  React.useEffect(() => {
+    const handleResize = () => {
+      setIsMobileScreen(window.innerWidth < 1024);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isEffectiveMobile = preferredViewMode === 'mobile' || (preferredViewMode === 'auto' && isMobileScreen);
+
+  const toggleMobileMode = () => {
+    setPreferredViewMode((prev) => {
+      const next = isEffectiveMobile ? 'desktop' : 'mobile';
+      try {
+        localStorage.setItem('pekasa_view_mode', next);
+      } catch {}
+      return next;
+    });
+  };
 
   if (isLoading) {
     return (
@@ -129,13 +173,46 @@ const MainApp: React.FC = () => {
     setActiveTab('payments');
   };
 
+  // Dedicated Mobile Viewport Experience
+  if (isEffectiveMobile) {
+    return (
+      <div className="relative min-h-screen bg-slate-950">
+        <MobileApp
+          onSwitchToDesktop={() => {
+            setPreferredViewMode('desktop');
+            try {
+              localStorage.setItem('pekasa_view_mode', 'desktop');
+            } catch {}
+          }}
+        />
+        {/* Floating Desktop Switcher on wider screens if user forced mobile */}
+        {typeof window !== 'undefined' && window.innerWidth >= 1024 && (
+          <div className="fixed top-3 right-20 z-50">
+            <button
+              onClick={() => {
+                setPreferredViewMode('desktop');
+                try {
+                  localStorage.setItem('pekasa_view_mode', 'desktop');
+                } catch {}
+              }}
+              className="px-3 py-1.5 rounded-xl bg-slate-900 border border-white/20 text-xs font-bold text-white hover:bg-slate-800 flex items-center gap-1.5 shadow-xl cursor-pointer"
+            >
+              <Laptop className="w-3.5 h-3.5 text-[#0ABAB5]" />
+              <span>Desktop View</span>
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex font-sans transition-colors duration-200">
       {/* Left navigation panel (desktop) */}
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
       <div className="flex-1 min-w-0 flex flex-col">
-      {/* Top Header with Global Search and Theme Controls */}
+      {/* Top Header with Global Search, Avatar User Menu and Secondary Staff Bar */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -145,6 +222,16 @@ const MainApp: React.FC = () => {
         onSearchInTab={handleSearchInTab}
         onOpenAddCustomerWithItems={() => setIsAddCustomerWithItemsOpen(true)}
         onGoToHome={() => setViewMode('home')}
+        activeStaffSubTab={activeStaffSubTab}
+        onSelectStaffSubTab={(sub) => {
+          setActiveStaffSubTab(sub);
+          setActiveTab('partners');
+        }}
+        onNavigateToSettingsSection={(sec) => {
+          setSettingsSection(sec);
+          setActiveTab('settings');
+        }}
+        onToggleMobileMode={toggleMobileMode}
       />
 
       {/* Main View Area */}
@@ -334,8 +421,29 @@ const MainApp: React.FC = () => {
               </button>
             </div>
           ) : (
-            <PartnersView />
+            <PartnersView
+              activeSubTab={activeStaffSubTab}
+              onSubTabChange={(sub) => setActiveStaffSubTab(sub)}
+            />
           )
+        )}
+
+        {/* User Profile View (Photo upload, credentials, password change, audit) */}
+        {activeTab === 'profile' && (
+          <UserProfileView
+            onNavigateToSettings={(sec) => {
+              if (sec) setSettingsSection(sec);
+              setActiveTab('settings');
+            }}
+          />
+        )}
+
+        {/* Settings & Appearance View (Full Theme Customizer, Notifications, Business, Security & Data) */}
+        {activeTab === 'settings' && (
+          <SettingsView
+            initialSection={settingsSection}
+            onNavigateToProfile={() => setActiveTab('profile')}
+          />
         )}
       </main>
 
@@ -377,6 +485,15 @@ const MainApp: React.FC = () => {
             >
               <Palette className="w-3.5 h-3.5" style={{ color: currentAccent.primary }} />
               <span>Theme Panel</span>
+            </button>
+
+            <button
+              onClick={toggleMobileMode}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-white/15 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer text-slate-200 font-semibold"
+              title="Switch to Mobile-First Experience"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-[#0ABAB5]" />
+              <span>Mobile View</span>
             </button>
 
             <span>·</span>

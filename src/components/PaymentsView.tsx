@@ -36,11 +36,18 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
   initialApplianceForPayment,
   onClearInitialAppliance
 }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, businessSettings } = useAuth();
   const payments = sqliteService.getPayments();
   const appliances = sqliteService.getAppliances();
   const customers = sqliteService.getCustomers();
   const invoices = sqliteService.getInvoices();
+
+  const storeName = businessSettings?.business_name || STORE_NAME;
+  const storeMotto = businessSettings?.business_motto || STORE_MOTTO;
+  const storePhone = businessSettings?.business_phone || STORE_TEL;
+  const storeEmail = businessSettings?.business_email || '';
+  const storeAddress = businessSettings?.business_address || 'Nairobi, Kenya';
+  const receiptFooter = businessSettings?.receipt_footer || 'Keep this receipt safe as proof of transaction.';
 
   const [searchQuery, setSearchQuery] = useState('');
   const [methodFilter, setMethodFilter] = useState<string>('ALL');
@@ -665,15 +672,20 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
             <div className="theme-static p-6 bg-white text-black font-mono text-xs space-y-3 print-receipt-container">
               {/* Receipt Header */}
               <div className="text-center space-y-1 border-b border-black pb-3">
-                <h2 className="text-xl font-black uppercase tracking-wider">{STORE_NAME}</h2>
+                {businessSettings?.logo_url && (
+                  <div className="flex justify-center mb-1">
+                    <img src={businessSettings.logo_url} alt={storeName} className="h-10 max-w-[140px] object-contain" />
+                  </div>
+                )}
+                <h2 className="text-xl font-black uppercase tracking-wider">{storeName}</h2>
                 <p className="text-[10px] italic leading-tight text-slate-700">
-                  "{STORE_MOTTO}"
+                  "{storeMotto}"
                 </p>
                 <div className="text-xs font-bold text-black pt-1">
-                  Tel: {STORE_TEL}
+                  Tel: {storePhone} {storeEmail ? `· ${storeEmail}` : ''}
                 </div>
                 <p className="text-[10px] text-slate-600">
-                  Nairobi, Kenya · Directors: Trevor & Peter
+                  {storeAddress} · Directors: Trevor & Peter
                 </p>
               </div>
 
@@ -766,11 +778,11 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
               {/* Receipt Footer with Store Contact Numbers */}
               <div className="text-center text-[10px] text-slate-600 pt-1 space-y-1">
                 <p className="font-bold text-black text-xs">
-                  Customer Helpline: {STORE_TEL}
+                  Customer Helpline: {storePhone}
                 </p>
-                <p>* Keep this receipt safe as proof of transaction.</p>
-                <p>* {STORE_NAME} Relational System Verified.</p>
-                <p className="font-bold text-black">Thank you for doing business with {STORE_NAME}!</p>
+                <p className="whitespace-pre-line">* {receiptFooter}</p>
+                <p>* {storeName} Relational System Verified.</p>
+                <p className="font-bold text-black">Thank you for doing business with {storeName}!</p>
               </div>
             </div>
           </div>
