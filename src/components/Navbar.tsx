@@ -100,7 +100,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [isVerifying, setIsVerifying] = useState(false);
 
   // Role-based nav links (shown in the left sidebar on desktop, and in the compact bar below on mobile)
-  const navLinks = getNavLinks(isCashier, partnerDeskTitle);
+  const navLinks = getNavLinks(isCashier, partnerDeskTitle, isAdmin);
 
   const handleInitiateSwitch = (newUserId: string) => {
     if (newUserId === currentUser?.id) return;
