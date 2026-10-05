@@ -13,7 +13,7 @@ type CloudSession = {
 };
 type SnapshotRow = {
   user_id: string;
-  snapshot_base64: string;
+  snapshot_base64?: string;
   device_id: string;
   updated_at: string;
 };
@@ -167,10 +167,10 @@ class SupabaseCloudSync {
     return refreshed;
   }
 
-  private async requestRows(): Promise<SnapshotRow[]> {
+  private async requestRows(includeSnapshot = true): Promise<SnapshotRow[]> {
     const session = await this.ensureFreshSession();
     const url = new URL(TABLE_URL);
-    url.searchParams.set('select', 'user_id,snapshot_base64,device_id,updated_at');
+    url.searchParams.set('select', includeSnapshot ? 'user_id,snapshot_base64,device_id,updated_at' : 'user_id,device_id,updated_at');
     url.searchParams.set('user_id', 'eq.' + session.user.id);
     const response = await fetch(url.toString(), {
       headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: 'Bearer ' + session.access_token },
@@ -226,11 +226,14 @@ class SupabaseCloudSync {
     this.timer = null;
     try {
       if (!force) {
-        const rows = await this.requestRows();
+        const rows = await this.requestRows(false);
         const latest = rows[0];
         if (latest && this.lastRemoteUpdatedAt && latest.updated_at !== this.lastRemoteUpdatedAt && latest.device_id !== this.deviceId) {
+          const fullRows = await this.requestRows(true);
+          const current = fullRows[0];
+          if (!current || current.updated_at !== latest.updated_at) return;
           this.pendingBytes = bytes;
-          await this.createConflict(latest, bytes);
+          await this.createConflict(current, bytes);
           return;
         }
         if (latest && !this.lastRemoteUpdatedAt) this.lastRemoteUpdatedAt = latest.updated_at;
@@ -264,7 +267,7 @@ class SupabaseCloudSync {
   private async createConflict(remote: SnapshotRow, localBytes: Uint8Array) {
     this.conflict = {
       localBytes: localBytes.slice(),
-      remoteBytes: decodeBytes(remote.snapshot_base64),
+      remoteBytes: decodeBytes(remote.snapshot_base64 || ''),
       updatedAt: remote.updated_at,
     };
     this.setState('conflict');
@@ -273,15 +276,18 @@ class SupabaseCloudSync {
   private async pollRemote() {
     if (!this.session || !this.applyRemote || this.conflict) return;
     try {
-      const rows = await this.requestRows();
-      const remote = rows[0];
-      if (!remote) return;
-      if (remote.updated_at === this.lastRemoteUpdatedAt) return;
-      if (remote.device_id === this.deviceId) {
-        this.lastRemoteUpdatedAt = remote.updated_at;
+      const rows = await this.requestRows(false);
+      const metadata = rows[0];
+      if (!metadata) return;
+      if (metadata.updated_at === this.lastRemoteUpdatedAt) return;
+      if (metadata.device_id === this.deviceId) {
+        this.lastRemoteUpdatedAt = metadata.updated_at;
         this.setState('synced');
         return;
       }
+      const fullRows = await this.requestRows(true);
+      const remote = fullRows[0];
+      if (!remote || remote.updated_at !== metadata.updated_at || !remote.snapshot_base64) return;
       const localChangedAfterRemote = this.lastLocalWriteAt && Date.parse(remote.updated_at) > Date.parse(this.lastLocalWriteAt);
       if (this.pendingBytes || localChangedAfterRemote) {
         await this.createConflict(remote, this.pendingBytes || (this.readLocal ? this.readLocal() : new Uint8Array()));
