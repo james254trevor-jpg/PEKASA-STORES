@@ -4,8 +4,8 @@ const SESSION_KEY = 'pekasa_supabase_session_v1';
 const DEVICE_KEY = 'pekasa_supabase_device_v1';
 const TABLE_URL = SUPABASE_URL + '/rest/v1/pekasa_store_snapshots';
 
-type CloudUser = { id: string; email?: string };
-type CloudSession = {
+export type CloudUser = { id: string; email?: string };
+export type CloudSession = {
   access_token: string;
   refresh_token: string;
   expires_at: number;
