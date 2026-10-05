@@ -522,6 +522,8 @@ class SQLiteService {
       try { this.db.run('ALTER TABLE users ADD COLUMN two_factor_enabled INTEGER DEFAULT 0;'); } catch {}
       try { this.db.run('ALTER TABLE customers ADD COLUMN customer_number TEXT;'); } catch {}
       try { this.db.run('ALTER TABLE customers ADD COLUMN alt_phone TEXT;'); } catch {}
+      // Upgrade existing local databases before customer intake writes the email field.
+      try { this.db.run('ALTER TABLE customers ADD COLUMN email TEXT;'); } catch {}
       try { this.db.run('ALTER TABLE customers ADD COLUMN county TEXT;'); } catch {}
       try { this.db.run('ALTER TABLE customers ADD COLUMN id_photo_url TEXT;'); } catch {}
       try { this.db.run('ALTER TABLE customers ADD COLUMN status TEXT DEFAULT "Good Standing";'); } catch {}
@@ -623,6 +625,7 @@ class SQLiteService {
         id_number TEXT UNIQUE NOT NULL,
         phone TEXT NOT NULL,
         alt_phone TEXT,
+        email TEXT,
         address TEXT,
         county TEXT,
         photo_url TEXT,
@@ -2274,6 +2277,142 @@ class SQLiteService {
       suppliers: this.getSuppliers(),
       auditLogs: this.getAuditLogs()
     }, null, 2);
+  }
+
+  /**
+   * Merge another device's SQLite snapshot into this database.
+   * Rows with different primary keys are retained from both devices. For rows
+   * with the same key, the row with the newest update timestamp is kept.
+   */
+  public async mergeFromSqliteBinary(bytes: Uint8Array, sourceDeviceId = 'device', preferRemoteUntimestamped = true): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+    const SQL = await initSqlAsm();
+    const incoming = new SQL.Database(bytes);
+    const quote = (name: string) => '"' + name.replace(/"/g, '""') + '"';
+    const codeColumns: Record<string, string[]> = {
+      customers: ['customer_number'],
+      collateral_items: ['collateral_number'],
+      rehani_loans: ['loan_number'],
+      loan_renewals: ['renewal_number'],
+      ledger_transactions: ['transaction_number', 'receipt_number'],
+      collateral_sales: ['sale_number'],
+      operating_expenses: ['expense_number'],
+      appliances: ['appliance_number'],
+      payments: ['receipt_number'],
+      invoices: ['invoice_number'],
+      payment_void_requests: ['request_number'],
+      parts: ['sku']
+    };
+    const suffix = sourceDeviceId.replace(/[^a-zA-Z0-9]/g, '').slice(-5) || Math.random().toString(36).slice(2, 7);
+    const remoteCodeRemaps: Record<string, Record<string, string>> = {};
+    const readRows = (database: Database, sql: string): Array<Record<string, any>> => {
+      const result = database.exec(sql)[0];
+      if (!result) return [];
+      return result.values.map((values) =>
+        Object.fromEntries(result.columns.map((column, index) => [column, values[index]]))
+      );
+    };
+    const existsBy = (table: string, column: string, value: any, pkColumns: string[], pkValues: any[]) => {
+      const where = [`${quote(column)} = :value`, ...pkColumns.map((columnName, index) => `${quote(columnName)} != :pk${index}`)].join(' AND ');
+      const params: Record<string, any> = { ':value': value };
+      pkValues.forEach((pkValue, index) => { params[':pk' + index] = pkValue; });
+      return this.query(`SELECT 1 AS found FROM ${quote(table)} WHERE ${where} LIMIT 1`, params).length > 0;
+    };
+
+    this.db.run('PRAGMA foreign_keys = OFF;');
+    this.db.run('BEGIN TRANSACTION;');
+    try {
+      const incomingTables = readRows(incoming, "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'");
+      for (const tableRow of incomingTables) {
+        const table = String(tableRow.name);
+        const localExists = this.query<{ name: string }>(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = :name",
+          { ':name': table }
+        ).length > 0;
+        if (!localExists) continue;
+
+        const incomingInfo = readRows(incoming, `PRAGMA table_info(${quote(table)})`);
+        const localInfo = this.query<{ name: string; pk: number }>(`PRAGMA table_info(${quote(table)})`);
+        const localNames = new Set(localInfo.map((column) => column.name));
+        const columns = incomingInfo.map((column: any) => String(column.name)).filter((name) => localNames.has(name));
+        const pkColumns = localInfo.filter((column) => Number(column.pk) > 0).sort((a, b) => Number(a.pk) - Number(b.pk)).map((column) => column.name);
+        if (columns.length === 0 || pkColumns.length === 0) continue;
+
+        const remoteRows = readRows(incoming, `SELECT * FROM ${quote(table)}`);
+        for (const sourceRow of remoteRows) {
+          const remoteRow = { ...sourceRow };
+          for (const [column, mappings] of Object.entries(remoteCodeRemaps)) {
+            if (typeof remoteRow[column] === 'string' && mappings[remoteRow[column]]) {
+              remoteRow[column] = mappings[remoteRow[column]];
+            }
+          }
+          const pkValues = pkColumns.map((column) => remoteRow[column]);
+          if (pkValues.some((value) => value === null || value === undefined)) continue;
+          const pkWhere = pkColumns.map((column, index) => `${quote(column)} = :pk${index}`).join(' AND ');
+          const pkParams: Record<string, any> = {};
+          pkValues.forEach((value, index) => { pkParams[':pk' + index] = value; });
+          const localRow = this.query<Record<string, any>>(
+            `SELECT * FROM ${quote(table)} WHERE ${pkWhere} LIMIT 1`,
+            pkParams
+          )[0];
+          const remoteUpdated = String(remoteRow.updated_at || remoteRow.last_login || remoteRow.reviewed_at || remoteRow.closed_at || remoteRow.uploaded_at || '');
+          const localUpdated = String(localRow?.updated_at || localRow?.last_login || localRow?.reviewed_at || localRow?.closed_at || localRow?.uploaded_at || '');
+          const shouldReplace = !localRow
+            || (localUpdated && remoteUpdated ? remoteUpdated >= localUpdated : preferRemoteUntimestamped);
+          if (!shouldReplace) continue;
+
+          const mergedRow: Record<string, any> = {};
+          columns.forEach((column) => { mergedRow[column] = remoteRow[column]; });
+          if (table === 'sequence_counters' && localRow && mergedRow.last_sequence !== undefined) {
+            mergedRow.last_sequence = Math.max(Number(localRow.last_sequence) || 0, Number(mergedRow.last_sequence) || 0);
+          }
+
+          // Sequence-generated display codes can overlap when devices create
+          // records offline. Keep both records and give the incoming code a
+          // device suffix instead of dropping the new row on a UNIQUE conflict.
+          const codeCols = codeColumns[table] || [];
+          for (const column of codeCols) {
+            if (mergedRow[column] === null || mergedRow[column] === undefined) continue;
+            if (existsBy(table, column, mergedRow[column], pkColumns, pkValues)) {
+              const original = String(mergedRow[column]);
+              let candidate = `${original}-${suffix}`;
+              let attempt = 1;
+              while (existsBy(table, column, candidate, pkColumns, pkValues)) {
+                candidate = `${original}-${suffix}-${attempt++}`;
+              }
+              mergedRow[column] = candidate;
+              remoteCodeRemaps[column] ||= {};
+              remoteCodeRemaps[column][original] = candidate;
+            }
+          }
+
+          const writeColumns = columns.filter((column) => !pkColumns.includes(column));
+          if (localRow) {
+            const assignments = writeColumns.map((column) => `${quote(column)} = :v_${column}`).join(', ');
+            if (assignments) {
+              const params: Record<string, any> = { ...pkParams };
+              writeColumns.forEach((column) => { params[':v_' + column] = mergedRow[column]; });
+              this.db.run(`UPDATE ${quote(table)} SET ${assignments} WHERE ${pkWhere}`, params);
+            }
+          } else {
+            const names = columns.map(quote).join(', ');
+            const placeholders = columns.map((column) => ':v_' + column).join(', ');
+            const params: Record<string, any> = {};
+            columns.forEach((column) => { params[':v_' + column] = mergedRow[column]; });
+            this.db.run(`INSERT INTO ${quote(table)} (${names}) VALUES (${placeholders})`, params);
+          }
+        }
+      }
+      this.db.run('COMMIT;');
+    } catch (error) {
+      this.db.run('ROLLBACK;');
+      throw error;
+    } finally {
+      incoming.close();
+      this.db.run('PRAGMA foreign_keys = ON;');
+    }
+    await this.persist();
+    this.notify();
   }
 
   public async restoreFromSqliteBinary(bytes: Uint8Array): Promise<void> {

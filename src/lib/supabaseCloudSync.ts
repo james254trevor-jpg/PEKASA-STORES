@@ -44,10 +44,12 @@ class SupabaseCloudSync {
   private pendingBytes: Uint8Array | null = null;
   private lastRemoteUpdatedAt: string | null = null;
   private lastLocalWriteAt: string | null = null;
+  private localDirtyAt: number | null = null;
   private conflict: Conflict | null = null;
   private applyingRemote = false;
   private uploadInProgress = false;
   private applyRemote: ((bytes: Uint8Array) => Promise<void>) | null = null;
+  private mergeRemote: ((bytes: Uint8Array, deviceId: string, preferRemoteUntimestamped: boolean) => Promise<void>) | null = null;
   private readLocal: (() => Uint8Array) | null = null;
   private status: Status = 'signed-out';
   private errorMessage = '';
@@ -189,9 +191,14 @@ class SupabaseCloudSync {
     return decodeBytes(row.snapshot_base64);
   }
 
-  startLiveSync(applyRemote: (bytes: Uint8Array) => Promise<void>, readLocal: () => Uint8Array) {
+  startLiveSync(
+    applyRemote: (bytes: Uint8Array) => Promise<void>,
+    readLocal: () => Uint8Array,
+    mergeRemote?: (bytes: Uint8Array, deviceId: string, preferRemoteUntimestamped: boolean) => Promise<void>,
+  ) {
     this.stopLiveSync();
     this.applyRemote = applyRemote;
+    this.mergeRemote = mergeRemote || null;
     this.readLocal = readLocal;
     this.deviceId = this.getDeviceId();
     this.setState('ready');
@@ -208,12 +215,14 @@ class SupabaseCloudSync {
     this.pendingBytes = null;
     this.conflict = null;
     this.applyRemote = null;
+    this.mergeRemote = null;
     this.readLocal = null;
   }
 
   queueUpload(bytes: Uint8Array) {
     if (!this.session || !this.readLocal || this.applyingRemote) return;
     this.pendingBytes = bytes.slice();
+    this.localDirtyAt = Date.now();
     this.setState('syncing');
     if (this.timer !== null) window.clearTimeout(this.timer);
     this.timer = window.setTimeout(() => void this.flushUpload(false), 700);
@@ -227,7 +236,7 @@ class SupabaseCloudSync {
   private async flushUpload(force: boolean) {
     if (!this.session || !this.pendingBytes || this.conflict || this.uploadInProgress) return;
     this.uploadInProgress = true;
-    const bytes = this.pendingBytes;
+    let bytes = this.pendingBytes;
     this.pendingBytes = null;
     if (this.timer !== null) window.clearTimeout(this.timer);
     this.timer = null;
@@ -238,32 +247,74 @@ class SupabaseCloudSync {
         if (latest && this.lastRemoteUpdatedAt && latest.updated_at !== this.lastRemoteUpdatedAt && latest.device_id !== this.deviceId) {
           const fullRows = await this.requestRows(true);
           const current = fullRows[0];
-          if (!current || current.updated_at !== latest.updated_at) return;
-          this.pendingBytes = bytes;
-          await this.createConflict(current, bytes);
-          return;
+          if (!current || current.updated_at !== latest.updated_at || !current.snapshot_base64) {
+            this.pendingBytes = bytes;
+            this.timer = window.setTimeout(() => void this.flushUpload(false), 700);
+            return;
+          }
+          if (!this.mergeRemote) {
+            this.pendingBytes = bytes;
+            await this.createConflict(current, bytes);
+            return;
+          }
+          this.applyingRemote = true;
+          try {
+            await this.mergeRemote(decodeBytes(current.snapshot_base64), current.device_id, Date.parse(current.updated_at) >= (this.localDirtyAt || 0));
+          } finally {
+            this.applyingRemote = false;
+          }
+          this.lastRemoteUpdatedAt = current.updated_at;
+          bytes = this.readLocal ? this.readLocal() : bytes;
         }
         if (latest && !this.lastRemoteUpdatedAt) this.lastRemoteUpdatedAt = latest.updated_at;
       }
       const session = await this.ensureFreshSession();
-      const response = await fetch(TABLE_URL + '?on_conflict=user_id', {
-        method: 'POST',
-        headers: {
-          apikey: SUPABASE_PUBLISHABLE_KEY,
-          Authorization: 'Bearer ' + session.access_token,
-          'Content-Type': 'application/json',
-          Prefer: 'resolution=merge-duplicates,return=representation',
-        },
-        body: JSON.stringify({
-          user_id: session.user.id,
-          snapshot_base64: encodeBytes(bytes),
-          device_id: this.deviceId,
-        }),
-      });
+      const payload = {
+        snapshot_base64: encodeBytes(bytes),
+        device_id: this.deviceId,
+      };
+      let response: Response;
+      if (this.lastRemoteUpdatedAt) {
+        // Compare-and-set prevents a third device's write arriving between our
+        // read/merge and save from being silently overwritten.
+        const url = new URL(TABLE_URL);
+        url.searchParams.set('user_id', 'eq.' + session.user.id);
+        url.searchParams.set('updated_at', 'eq.' + this.lastRemoteUpdatedAt);
+        response = await fetch(url.toString(), {
+          method: 'PATCH',
+          headers: {
+            apikey: SUPABASE_PUBLISHABLE_KEY,
+            Authorization: 'Bearer ' + session.access_token,
+            'Content-Type': 'application/json',
+            Prefer: 'return=representation',
+          },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        response = await fetch(TABLE_URL + '?on_conflict=user_id', {
+          method: 'POST',
+          headers: {
+            apikey: SUPABASE_PUBLISHABLE_KEY,
+            Authorization: 'Bearer ' + session.access_token,
+            'Content-Type': 'application/json',
+            Prefer: 'resolution=merge-duplicates,return=representation',
+          },
+          body: JSON.stringify({ user_id: session.user.id, ...payload }),
+        });
+      }
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.message || 'Could not save the store snapshot.');
-      this.lastRemoteUpdatedAt = result[0]?.updated_at || this.lastRemoteUpdatedAt;
+      if (!result[0]?.updated_at) {
+        // The remote row changed after our merge. Keep the local work queued;
+        // the next pass reads and merges the newer cloud copy before retrying.
+        this.pendingBytes = bytes;
+        this.setState('syncing');
+        this.timer = window.setTimeout(() => void this.flushUpload(false), 700);
+        return;
+      }
+      this.lastRemoteUpdatedAt = result[0].updated_at;
       this.lastLocalWriteAt = this.lastRemoteUpdatedAt;
+      this.localDirtyAt = null;
       this.setState('synced');
     } catch (error) {
       this.pendingBytes = bytes;
@@ -303,7 +354,21 @@ class SupabaseCloudSync {
       if (!remote || remote.updated_at !== metadata.updated_at || !remote.snapshot_base64) return;
       const localChangedAfterRemote = this.lastLocalWriteAt && Date.parse(remote.updated_at) > Date.parse(this.lastLocalWriteAt);
       if (this.pendingBytes || localChangedAfterRemote) {
-        await this.createConflict(remote, this.pendingBytes || (this.readLocal ? this.readLocal() : new Uint8Array()));
+        if (!this.mergeRemote) {
+          await this.createConflict(remote, this.pendingBytes || (this.readLocal ? this.readLocal() : new Uint8Array()));
+          return;
+        }
+        this.applyingRemote = true;
+        try {
+          await this.mergeRemote(decodeBytes(remote.snapshot_base64), remote.device_id, Date.parse(remote.updated_at) >= (this.localDirtyAt || 0));
+        } finally {
+          this.applyingRemote = false;
+        }
+        this.lastRemoteUpdatedAt = remote.updated_at;
+        this.lastLocalWriteAt = null;
+        this.pendingBytes = this.readLocal ? this.readLocal() : null;
+        this.setState('syncing');
+        await this.flushUpload(false);
         return;
       }
       this.applyingRemote = true;
@@ -313,6 +378,7 @@ class SupabaseCloudSync {
         this.applyingRemote = false;
       }
       this.lastRemoteUpdatedAt = remote.updated_at;
+      this.localDirtyAt = null;
       this.setState('synced');
     } catch (error) {
       this.setState('error', error instanceof Error ? error.message : 'Could not refresh the cloud snapshot.');
