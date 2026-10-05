@@ -46,6 +46,7 @@ class SupabaseCloudSync {
   private lastLocalWriteAt: string | null = null;
   private conflict: Conflict | null = null;
   private applyingRemote = false;
+  private uploadInProgress = false;
   private applyRemote: ((bytes: Uint8Array) => Promise<void>) | null = null;
   private readLocal: (() => Uint8Array) | null = null;
   private status: Status = 'signed-out';
@@ -218,8 +219,14 @@ class SupabaseCloudSync {
     this.timer = window.setTimeout(() => void this.flushUpload(false), 700);
   }
 
+  async retryPending(): Promise<void> {
+    if (this.pendingBytes && !this.conflict) await this.flushUpload(false);
+    else await this.pollRemote();
+  }
+
   private async flushUpload(force: boolean) {
-    if (!this.session || !this.pendingBytes || this.conflict) return;
+    if (!this.session || !this.pendingBytes || this.conflict || this.uploadInProgress) return;
+    this.uploadInProgress = true;
     const bytes = this.pendingBytes;
     this.pendingBytes = null;
     if (this.timer !== null) window.clearTimeout(this.timer);
@@ -261,6 +268,8 @@ class SupabaseCloudSync {
     } catch (error) {
       this.pendingBytes = bytes;
       this.setState('error', error instanceof Error ? error.message : 'Cloud sync failed.');
+    } finally {
+      this.uploadInProgress = false;
     }
   }
 
@@ -274,7 +283,11 @@ class SupabaseCloudSync {
   }
 
   private async pollRemote() {
-    if (!this.session || !this.applyRemote || this.conflict) return;
+    if (!this.session || !this.applyRemote || this.conflict || this.uploadInProgress) return;
+    if (this.pendingBytes && this.timer === null && this.status === 'error') {
+      await this.flushUpload(false);
+      return;
+    }
     try {
       const rows = await this.requestRows(false);
       const metadata = rows[0];
