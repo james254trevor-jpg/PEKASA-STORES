@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { CloudSyncGate } from './components/CloudSyncGate';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
@@ -559,10 +560,12 @@ const MainApp: React.FC = () => {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <MainApp />
-      </AuthProvider>
-    </ThemeProvider>
+    <CloudSyncGate>
+      <ThemeProvider>
+        <AuthProvider>
+          <MainApp />
+        </AuthProvider>
+      </ThemeProvider>
+    </CloudSyncGate>
   );
 }
