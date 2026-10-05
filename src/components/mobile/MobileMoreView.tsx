@@ -36,6 +36,7 @@ interface MobileMoreViewProps {
   onOpenHelp: () => void;
   onOpenLoans: () => void;
   onOpenCollateral: () => void;
+  onOpenPersonalGoods: () => void;
 }
 
 export const MobileMoreView: React.FC<MobileMoreViewProps> = ({
@@ -50,7 +51,8 @@ export const MobileMoreView: React.FC<MobileMoreViewProps> = ({
   onOpenBackup,
   onOpenHelp,
   onOpenLoans,
-  onOpenCollateral
+  onOpenCollateral,
+  onOpenPersonalGoods
 }) => {
   const { currentUser, isAdmin, logout } = useAuth();
   const { currentAccent } = useTheme();
@@ -202,6 +204,15 @@ export const MobileMoreView: React.FC<MobileMoreViewProps> = ({
           </button>
         </div>
       </div>
+
+      {isAdmin && (
+        <section className="space-y-2.5">
+          <h3 className="px-1 text-xs font-bold uppercase tracking-wider text-slate-400">Personal Trade</h3>
+          <button onClick={onOpenPersonalGoods} className="w-full rounded-2xl border border-teal-500/20 bg-white/70 p-4 text-left shadow-sm transition-colors hover:bg-white dark:bg-slate-900/80 dark:hover:bg-white/10">
+            <span className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-500/10 text-teal-500"><ShoppingBag className="h-4 w-4" /></span><span><span className="block text-sm font-bold text-slate-900 dark:text-white">Personal Goods</span><span className="text-xs text-slate-500 dark:text-slate-400">Your own buy-and-sell items, kept separate from Rehani</span></span><ChevronRight className="ml-auto h-4 w-4 text-slate-400" /></span>
+          </button>
+        </section>
+      )}
 
       {/* Group 2: Analytics & Team */}
       <div className="space-y-2.5">

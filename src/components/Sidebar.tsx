@@ -10,7 +10,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
-  const { currentUser, isCashier } = useAuth();
+  const { currentUser, isCashier, isAdmin } = useAuth();
   const { currentAccent } = useTheme();
 
   // Collapsed icon-only mode with localStorage persistence
@@ -35,7 +35,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
 
   const isTrevor = currentUser?.username?.toLowerCase() === 'trevor';
   const partnerDeskTitle = isTrevor ? "Trevor's Desk" : "Peter's Desk";
-  const navLinks = getNavLinks(isCashier, partnerDeskTitle);
+  const navLinks = getNavLinks(isCashier, partnerDeskTitle, isAdmin);
 
   return (
     <aside

@@ -11,6 +11,7 @@ import { MobileProductDetailView } from './MobileProductDetailView';
 import { MobileCustomersView } from './MobileCustomersView';
 import { MobileCustomerProfileView } from './MobileCustomerProfileView';
 import { MobileMoreView } from './MobileMoreView';
+import { PersonalGoodsView } from '../PersonalGoodsView';
 import { MobileNotificationsSheet } from './MobileNotificationsSheet';
 import { MobileAddProductModal } from './MobileAddProductModal';
 import { MobileAddCustomerModal } from './MobileAddCustomerModal';
@@ -73,6 +74,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({ onSwitchToDesktop }) => {
     if (activeSubView === 'employees') return 'Staff & Cashiers';
     if (activeSubView === 'suppliers') return 'Suppliers';
     if (activeSubView === 'repairs') return 'Technician Hub';
+    if (activeSubView === 'personal-goods') return 'Personal Goods';
 
     switch (activeTab) {
       case 'home':
@@ -172,6 +174,8 @@ export const MobileApp: React.FC<MobileAppProps> = ({ onSwitchToDesktop }) => {
         ) : activeSubView === 'repairs' ? (
           /* Repairs View */
           <PartnersView activeSubTab="technicians" />
+        ) : activeSubView === 'personal-goods' ? (
+          isAdmin ? <PersonalGoodsView /> : <div className="rounded-xl bg-rose-500/10 p-5 text-center text-rose-300">Administrator access required.</div>
         ) : (
           /* Primary 5 Tabs */
           <>
@@ -235,6 +239,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({ onSwitchToDesktop }) => {
                 onOpenHelp={() => alert(`Official Helpline: 0727108749 / 0180366344\nDirectors: Trevor Mbugua & Peter Kamau\nNairobi, Kenya`)}
                 onOpenLoans={() => setActiveSubView('loans')}
                 onOpenCollateral={() => setActiveSubView('collateral')}
+                onOpenPersonalGoods={() => setActiveSubView('personal-goods')}
               />
             )}
           </>

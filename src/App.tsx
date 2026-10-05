@@ -15,6 +15,7 @@ import { AppliancesView } from './components/AppliancesView';
 import { CustomersView } from './components/CustomersView';
 import { PaymentsView } from './components/PaymentsView';
 import { InventoryPartsView } from './components/InventoryPartsView';
+import { PersonalGoodsView } from './components/PersonalGoodsView';
 import { PartnersView } from './components/PartnersView';
 import { BackupRestoreModal } from './components/BackupRestoreModal';
 import { ThemeSettingsPanel } from './components/ThemeSettingsPanel';
@@ -402,6 +403,11 @@ const MainApp: React.FC = () => {
 
         {/* Parts & Stock Inventory */}
         {activeTab === 'inventory' && <InventoryPartsView />}
+
+        {/* Admin-only personal trades: independent of Rehani and shop stock */}
+        {activeTab === 'personal-goods' && (
+          isAdmin ? <PersonalGoodsView /> : <div role="alert" className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-6 text-center text-rose-700 dark:text-rose-300">Administrator access required.</div>
+        )}
 
         {/* Admin, Staff Roles & System Reports (Admin Exclusive) */}
         {activeTab === 'partners' && (

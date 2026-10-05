@@ -12,7 +12,8 @@ import {
   Landmark,
   UserCog,
   Settings,
-  User
+  User,
+  ShoppingBag
 } from 'lucide-react';
 
 export interface NavLink {
@@ -26,7 +27,7 @@ export interface NavLink {
  * Role-based navigation shared by the left sidebar (desktop)
  * and the compact nav bar (mobile).
  */
-export const getNavLinks = (isCashier: boolean, partnerDeskTitle: string): NavLink[] =>
+export const getNavLinks = (isCashier: boolean, partnerDeskTitle: string, isAdmin = false): NavLink[] =>
   isCashier
     ? [
         { id: 'cashier-desk', label: 'Cashier Desk', icon: Wallet },
@@ -38,6 +39,7 @@ export const getNavLinks = (isCashier: boolean, partnerDeskTitle: string): NavLi
         { id: 'settings', label: 'Settings', icon: Settings }
       ]
     : [
+        ...(isAdmin ? [{ id: 'personal-goods', label: 'Personal Goods', icon: ShoppingBag }] : []),
         { id: 'portal', label: partnerDeskTitle, icon: Home, isPersonal: true },
         { id: 'dashboard', label: 'Command Center', icon: LayoutDashboard },
         { id: 'loans', label: 'Rehani Loans', icon: FileText },
