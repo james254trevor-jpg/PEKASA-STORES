@@ -522,6 +522,8 @@ class SQLiteService {
       try { this.db.run('ALTER TABLE users ADD COLUMN two_factor_enabled INTEGER DEFAULT 0;'); } catch {}
       try { this.db.run('ALTER TABLE customers ADD COLUMN customer_number TEXT;'); } catch {}
       try { this.db.run('ALTER TABLE customers ADD COLUMN alt_phone TEXT;'); } catch {}
+      // Upgrade existing local databases before customer intake writes the email field.
+      try { this.db.run('ALTER TABLE customers ADD COLUMN email TEXT;'); } catch {}
       try { this.db.run('ALTER TABLE customers ADD COLUMN county TEXT;'); } catch {}
       try { this.db.run('ALTER TABLE customers ADD COLUMN id_photo_url TEXT;'); } catch {}
       try { this.db.run('ALTER TABLE customers ADD COLUMN status TEXT DEFAULT "Good Standing";'); } catch {}
@@ -623,6 +625,7 @@ class SQLiteService {
         id_number TEXT UNIQUE NOT NULL,
         phone TEXT NOT NULL,
         alt_phone TEXT,
+        email TEXT,
         address TEXT,
         county TEXT,
         photo_url TEXT,
