@@ -2284,7 +2284,7 @@ class SQLiteService {
    * Rows with different primary keys are retained from both devices. For rows
    * with the same key, the row with the newest update timestamp is kept.
    */
-  public async mergeFromSqliteBinary(bytes: Uint8Array, sourceDeviceId = 'device'): Promise<void> {
+  public async mergeFromSqliteBinary(bytes: Uint8Array, sourceDeviceId = 'device', preferRemoteUntimestamped = true): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
     const SQL = await initSqlAsm();
     const incoming = new SQL.Database(bytes);
@@ -2350,7 +2350,8 @@ class SQLiteService {
           )[0];
           const remoteUpdated = String(remoteRow.updated_at || remoteRow.last_login || remoteRow.reviewed_at || remoteRow.closed_at || remoteRow.uploaded_at || '');
           const localUpdated = String(localRow?.updated_at || localRow?.last_login || localRow?.reviewed_at || localRow?.closed_at || localRow?.uploaded_at || '');
-          const shouldReplace = !localRow || !localUpdated || !remoteUpdated || remoteUpdated >= localUpdated;
+          const shouldReplace = !localRow
+            || (localUpdated && remoteUpdated ? remoteUpdated >= localUpdated : preferRemoteUntimestamped);
           if (!shouldReplace) continue;
 
           const mergedRow: Record<string, any> = {};
