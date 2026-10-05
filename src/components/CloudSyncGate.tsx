@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { supabaseCloudSync } from '../lib/supabaseCloudSync';
+import { supabaseCloudSync, type CloudSession } from '../lib/supabaseCloudSync';
 import { sqliteService } from '../db/sqlite';
 
 export const CloudSyncGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<CloudSession | null>(null);
   const [ready, setReady] = useState(false);
   const [checking, setChecking] = useState(true);
   const [email, setEmail] = useState('');
@@ -13,7 +13,7 @@ export const CloudSyncGate: React.FC<{ children: React.ReactNode }> = ({ childre
   const [message, setMessage] = useState('');
   const [sync, setSync] = useState(supabaseCloudSync.getState());
 
-  const openStore = async (nextSession: any) => {
+  const openStore = async (nextSession: CloudSession) => {
     setBusy(true);
     setMessage('Loading this store account…');
     try {
@@ -51,14 +51,6 @@ export const CloudSyncGate: React.FC<{ children: React.ReactNode }> = ({ childre
       supabaseCloudSync.stopLiveSync();
     };
   }, [ready, session]);
-
-  useEffect(() => {
-    const wake = () => {
-      // A focus event is handled by the normal three-second polling cycle.
-    };
-    window.addEventListener('pekasa-cloud-sync-wake', wake);
-    return () => window.removeEventListener('pekasa-cloud-sync-wake', wake);
-  }, []);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
