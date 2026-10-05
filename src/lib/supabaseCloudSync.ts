@@ -45,6 +45,7 @@ class SupabaseCloudSync {
   private lastRemoteUpdatedAt: string | null = null;
   private lastLocalWriteAt: string | null = null;
   private conflict: Conflict | null = null;
+  private applyingRemote = false;
   private applyRemote: ((bytes: Uint8Array) => Promise<void>) | null = null;
   private readLocal: (() => Uint8Array) | null = null;
   private status: Status = 'signed-out';
@@ -210,7 +211,7 @@ class SupabaseCloudSync {
   }
 
   queueUpload(bytes: Uint8Array) {
-    if (!this.session || !this.readLocal) return;
+    if (!this.session || !this.readLocal || this.applyingRemote) return;
     this.pendingBytes = bytes.slice();
     this.setState('syncing');
     if (this.timer !== null) window.clearTimeout(this.timer);
@@ -286,7 +287,12 @@ class SupabaseCloudSync {
         await this.createConflict(remote, this.pendingBytes || (this.readLocal ? this.readLocal() : new Uint8Array()));
         return;
       }
-      await this.applyRemote(decodeBytes(remote.snapshot_base64));
+      this.applyingRemote = true;
+      try {
+        await this.applyRemote(decodeBytes(remote.snapshot_base64));
+      } finally {
+        this.applyingRemote = false;
+      }
       this.lastRemoteUpdatedAt = remote.updated_at;
       this.setState('synced');
     } catch (error) {
@@ -297,7 +303,12 @@ class SupabaseCloudSync {
   async useCloudVersion(): Promise<void> {
     if (!this.conflict || !this.applyRemote) return;
     const conflict = this.conflict;
-    await this.applyRemote(conflict.remoteBytes);
+    this.applyingRemote = true;
+    try {
+      await this.applyRemote(conflict.remoteBytes);
+    } finally {
+      this.applyingRemote = false;
+    }
     this.lastRemoteUpdatedAt = conflict.updatedAt;
     this.lastLocalWriteAt = null;
     this.conflict = null;
