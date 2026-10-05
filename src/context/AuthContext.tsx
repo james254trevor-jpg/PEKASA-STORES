@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole, UserPermission, CashierSession, BusinessSettings } from '../types';
 import { sqliteService } from '../db/sqlite';
 import { verifyPassword, hashPassword, DEFAULT_SALT } from '../utils/security';
+import { supabaseCloudSync } from '../lib/supabaseCloudSync';
 
 export interface PendingOtpSession {
   tempToken: string;
@@ -116,6 +117,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     sqliteService.initialize().then(() => {
       loadData();
+      sqliteService.setCloudSyncHandler((bytes) => supabaseCloudSync.queueUpload(bytes));
+      supabaseCloudSync.startLiveSync(
+        async (bytes) => { await sqliteService.restoreFromSqliteBinary(bytes); },
+        () => sqliteService.exportDatabaseBinary(),
+      );
       setIsLoading(false);
     });
 
@@ -123,7 +129,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       loadData();
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      sqliteService.setCloudSyncHandler(null);
+      supabaseCloudSync.stopLiveSync();
+    };
   }, []);
 
   useEffect(() => {

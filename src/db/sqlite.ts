@@ -54,6 +54,16 @@ class SQLiteService {
   private db: Database | null = null;
   private isInitialized: boolean = false;
   private listeners: Set<() => void> = new Set();
+  private pendingCloudSnapshot: Uint8Array | null = null;
+  private cloudSyncHandler: ((bytes: Uint8Array) => void) | null = null;
+
+  public stageCloudSnapshot(bytes: Uint8Array): void {
+    this.pendingCloudSnapshot = bytes.slice();
+  }
+
+  public setCloudSyncHandler(handler: ((bytes: Uint8Array) => void) | null): void {
+    this.cloudSyncHandler = handler;
+  }
 
   public subscribe(cb: () => void) {
     this.listeners.add(cb);
@@ -79,7 +89,8 @@ class SQLiteService {
 
     try {
       const SQL = await initSqlAsm();
-      const savedBytes = await this.loadSavedDatabaseBytes();
+      const savedBytes = this.pendingCloudSnapshot || await this.loadSavedDatabaseBytes();
+      this.pendingCloudSnapshot = null;
 
       if (savedBytes && savedBytes.length > 0) {
         try {
@@ -98,7 +109,7 @@ class SQLiteService {
       this.isInitialized = true;
 
       // Auto-purge any previous dummy data on existing sessions for personal clean install
-      if (typeof window !== 'undefined' && localStorage.getItem('pekasa_clean_data_purged_v5') !== 'true') {
+      if (typeof window !== 'undefined' && localStorage.getItem('pekasa_clean_data_purged_v5') !== 'true' && !savedBytes) {
         await this.clearAllOperationalData();
         localStorage.setItem('pekasa_clean_data_purged_v5', 'true');
       } else {
@@ -1152,6 +1163,7 @@ class SQLiteService {
         }
         localStorage.setItem(DB_LOCAL_FALLBACK_KEY, btoa(binary));
       }
+      this.cloudSyncHandler?.(data.slice());
     } catch (err) {
       console.error('Failed to persist SQLite database:', err);
     }
