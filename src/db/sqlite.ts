@@ -2319,6 +2319,7 @@ class SQLiteService {
     };
 
     this.db.run('PRAGMA foreign_keys = OFF;');
+    this.db.run('BEGIN TRANSACTION;');
     try {
       const incomingTables = readRows(incoming, "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'");
       for (const tableRow of incomingTables) {
@@ -2392,6 +2393,10 @@ class SQLiteService {
           }
         }
       }
+      this.db.run('COMMIT;');
+    } catch (error) {
+      this.db.run('ROLLBACK;');
+      throw error;
     } finally {
       incoming.close();
       this.db.run('PRAGMA foreign_keys = ON;');
