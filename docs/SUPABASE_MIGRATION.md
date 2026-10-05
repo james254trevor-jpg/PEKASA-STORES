@@ -15,16 +15,55 @@ Today every browser has its own private SQLite database. That means:
 ## What is already done (in this repo)
 
 - `supabase/migrations/20261004000000_initial_schema.sql`: all 24 tables, translated from the SQLite schema in `src/db/sqlite.ts`, plus indexes.
-- `supabase/migrations/20261004000100_row_level_security.sql`: the access rules.
-  - Not signed in: no access to anything.
-  - Active staff: read, add and edit day-to-day records; **cannot delete** them.
-  - Cashiers: see and edit only their own till sessions and void requests; cannot see treasury, expenses, sales or the audit log.
-  - Admins: everything, including treasury, expenses, collateral sales and staff accounts.
-  - Ledger and audit log are **append-only** (no one can edit or delete a row, not even an admin).
-  - Deactivated staff and logins with no staff record have no access.
-- `supabase/tests/`: 38 checks of those rules, run against a real PostgreSQL server. I also broke the rules on purpose in six different ways to confirm the tests notice (they did).
+- `supabase/migrations/20261004000100_row_level_security.sql`: first, simpler access rules (superseded by the next file, still safe to run first).
+- `supabase/migrations/20261005000000_branch_separation_and_roles.sql`: the real access rules (below). It can be run on top of the previous file and can be re-run safely.
+- `supabase/tests/`: 131 checks run against a real PostgreSQL server. I also broke the rules on purpose in eight different ways to confirm the tests notice (they did, every time).
 
 Nothing in the app uses Supabase yet. The live system still runs on browser SQLite.
+
+## The access rules (enforced by the database)
+
+**Branches are kept apart.** Everyone except admins can only see and change records of **their own branch** (`users.branch_id`). A staff member with no branch assigned sees nothing. Admins (the directors) see every branch.
+
+**Roles follow the permission list you already maintain** (`user_roles.permissions_json`, edited in the app). The database reads it live, so ticking a permission for a role takes effect immediately, with no SQL:
+
+| Permission | What it unlocks (own branch only) |
+| --- | --- |
+| `can_manage_appliances` | customers, collateral items, appliances, photos |
+| `can_issue_money` | loans, and registering customers |
+| `can_renew_loans` | loan renewals |
+| `can_record_payments` | payments, invoices, ledger entries |
+| `can_manage_parts` | parts, stock movements, suppliers |
+| `can_manage_expenses` | operating expenses: view, add, edit |
+| `can_authorize_sales` | collateral sales: view, add, edit |
+| `can_view_financials` | read-only view of expenses and sales |
+
+With the roles as the app defines them today:
+
+| | Cashier | Manager | Admin |
+| --- | --- | --- | --- |
+| Branches | own | own | all |
+| Read customers, collateral, loans, ledger | yes | yes | yes |
+| Take payments, write ledger entries | yes | yes | yes |
+| Own till, raise void requests | yes | yes | yes |
+| Issue / renew loans, manage collateral and customers | no | yes | yes |
+| Parts, suppliers, expenses, authorise collateral sales | no | yes | yes |
+| See all tills of the branch, reconcile, approve void requests | no | yes | yes |
+| Read the branch's staff list and audit log | no | yes | yes |
+| Treasury (partners' capital) | no | **no** | yes |
+| Create / change staff accounts, change role settings | no | **no** | yes |
+| Delete records | no | **no** | yes |
+
+Always true for everyone: the **ledger and audit log are append-only** (no one can edit or delete a row, not even an admin), deactivated staff lose access immediately, and anyone not signed in has no access at all.
+
+### Decisions I made that you should confirm
+
+1. **Customers belong to the branch that registered them** (the database adds the column and fills it in automatically). A customer's payments, invoices and appliances follow their branch.
+   - A national ID number must be unique across the whole business, so branch 2 cannot register someone already registered at branch 1. That blocks a defaulter from simply re-registering elsewhere, but branch 2 staff will see a "duplicate" error and cannot see the other record. If you'd rather allow the same person at several branches, the ID uniqueness rule needs to become per-branch.
+2. **Managers can authorise collateral sales** for their own branch, because that is how the app defines the manager role ("disposition authorizer"). The Collateral Sales screen currently says sales are reserved for the directors. If so, untick `can_authorize_sales` for managers.
+3. **Managers cannot see the treasury**, because it holds the partners' own capital and retained profit in one shared record. They do see their branch's expenses and sales.
+4. **Cashiers cannot issue loans, add collateral or register customers**, which matches the app's own cashier definition ("payment receipts, M-Pesa verification and ledger entry"). Today the counter screen offers a "+ Customer & Item" button to cashiers; once the app uses this database, that button must be hidden for cashiers, or you tick `can_issue_money` and `can_manage_appliances` for the cashier role.
+5. **Parts and stock are per branch; suppliers are a shared list.** Number counters (receipts, loan numbers) are shared by all branches.
 
 ## Why the app can't just be switched over in one step
 
@@ -38,9 +77,9 @@ after each change, would be risky for a system that handles real money.
 
 ### Phase 0: Prepare (you, about 30 minutes)
 1. Create a free project at supabase.com. Pick the region nearest to Kenya that is offered (check the region list when you create it; closer means faster).
-2. In **SQL Editor**, run the two migration files in order. Do **not** run `supabase/tests/00_supabase_shim.sql` (that is only for plain-Postgres testing).
+2. In **SQL Editor**, run the three files in `supabase/migrations/` in order (oldest name first). Do **not** run anything in `supabase/tests/` (that is only for plain-Postgres testing). Your project is `jnyommgrfooxprzmagrw`, so its address is `https://jnyommgrfooxprzmagrw.supabase.co`.
 3. In **Authentication → Providers**, keep Email enabled. (Phone/SMS login can be added later.)
-4. From **Project Settings → API**, note the project URL and the `anon` key. The `service_role` key is secret: it must only ever be used on the server, never in the app.
+4. From **Project Settings → API**, copy the `anon` (public) key. The `service_role` key is secret: it must only ever be used on the server, never in the app.
 5. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in Netlify/Vercel. (The anon key is designed to be public; the access rules protect the data.)
 
 ### Phase 1: Sign-in through Supabase Auth
@@ -69,11 +108,12 @@ after each change, would be risky for a system that handles real money.
 - Turn on Supabase's daily backups (paid plans) or schedule your own export.
 - Add error monitoring and a staging project for trying changes safely.
 
-## Known gaps in the access rules (decide before go-live)
+## Known gaps (decide before go-live)
 
-- **Branch separation:** staff can see every branch's records. If branches must not see each other's data, add `branch_id = <user's branch>` to the policies.
-- **Cashier edits to shared records:** cashiers can edit customers, loans and collateral (needed for daily work). Tighten per column or move sensitive changes behind admin approval functions if needed.
-- **Manager role:** treated like other staff. Say if managers should get more (or fewer) powers.
+- **Staff must be linked to a login.** Each staff row needs `auth_user_id` set and a `branch_id` (managers and cashiers without a branch see nothing). Directors can have any branch; they see all.
+- **Cashier / manager edits inside a branch are not limited per column.** A manager with `can_issue_money` can edit any field of a loan in their branch. If specific changes (e.g. interest rate) need director approval, they should go through an approval step.
+- **Customers registered before the move** need a branch. The import in Phase 3 should set it from their first loan or collateral item.
+- **Number counters are shared across branches** and are still advanced by the app. They become a server-side function in Phase 2 so two people can never get the same number.
 
 ## Costs
 
@@ -91,6 +131,7 @@ psql -d pekasa_test -v ON_ERROR_STOP=1 \
   -f supabase/tests/00_supabase_shim.sql \
   -f supabase/migrations/20261004000000_initial_schema.sql \
   -f supabase/migrations/20261004000100_row_level_security.sql \
+  -f supabase/migrations/20261005000000_branch_separation_and_roles.sql \
   -f supabase/tests/10_rls_test.sql
 ```
 

@@ -61,7 +61,7 @@ src/
   theme.css               light-mode colour layer (dark is the default)
 server/otp.ts             SMS code generation + verification (+ otp.test.ts)
 api/, netlify/functions/  thin wrappers that expose server/otp.ts on each host
-supabase/                 planned hosted-database schema (not yet used by the app)
+supabase/                 hosted-database schema, branch + role access rules and tests (not yet used by the app)
 docs/                     migration plan
 ```
 
