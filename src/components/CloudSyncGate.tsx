@@ -43,11 +43,8 @@ export const CloudSyncGate: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     if (!ready || !session) return;
     const unsubscribe = supabaseCloudSync.subscribe(() => setSync(supabaseCloudSync.getState()));
-    const onFocus = () => window.dispatchEvent(new Event('pekasa-cloud-sync-wake'));
-    window.addEventListener('focus', onFocus);
     return () => {
       unsubscribe();
-      window.removeEventListener('focus', onFocus);
       supabaseCloudSync.stopLiveSync();
     };
   }, [ready, session]);
@@ -100,9 +97,11 @@ export const CloudSyncGate: React.FC<{ children: React.ReactNode }> = ({ childre
   return (
     <>
       {children}
-      <button type="button" onClick={async () => { await supabaseCloudSync.signOut(); window.location.reload(); }} className="fixed bottom-3 right-3 z-[100] rounded-full border border-slate-700 bg-slate-950/90 px-3 py-1.5 text-xs text-slate-200 shadow-lg" title={sync.error || sync.email}>
-        {sync.status === 'conflict' ? 'Store sync needs a choice' : sync.status === 'error' ? 'Store sync error' : sync.status === 'syncing' ? 'Saving store data…' : 'Store account · sign out'}
-      </button>
+      <div className="fixed bottom-3 right-3 z-[100] flex items-center gap-2 rounded-full border border-slate-700 bg-slate-950/90 px-3 py-1.5 text-xs text-slate-200 shadow-lg" title={sync.error || sync.email}>
+        <span>{sync.status === 'conflict' ? 'Store sync needs a choice' : sync.status === 'error' ? 'Store sync error' : sync.status === 'syncing' ? 'Saving store data…' : 'Store account connected'}</span>
+        {sync.status === 'error' && <button type="button" onClick={() => void supabaseCloudSync.retryPending()} className="underline">Retry</button>}
+        <button type="button" disabled={sync.status === 'syncing' || sync.status === 'conflict' || sync.status === 'error'} onClick={async () => { await supabaseCloudSync.signOut(); window.location.reload(); }} className="underline disabled:opacity-50">Sign out</button>
+      </div>
       {sync.conflict && <div className="fixed inset-0 z-[200] grid place-items-center bg-black/60 p-4"><section role="alertdialog" aria-modal="true" className="w-full max-w-lg space-y-4 rounded-2xl bg-white p-6 text-slate-900 shadow-2xl"><h2 className="text-xl font-bold">Store data changed on another device</h2><p className="text-sm text-slate-600">Both devices have saved changes since the last sync. Choose which full store copy to keep. The other copy will be replaced.</p><div className="flex flex-col gap-2 sm:flex-row"><button onClick={() => void supabaseCloudSync.useCloudVersion()} className="flex-1 rounded-lg bg-slate-800 px-4 py-2 text-white">Use the other device’s copy</button><button onClick={() => void supabaseCloudSync.keepThisDeviceVersion()} className="flex-1 rounded-lg bg-amber-400 px-4 py-2 font-semibold">Keep this device’s copy</button></div></section></div>}
     </>
   );
