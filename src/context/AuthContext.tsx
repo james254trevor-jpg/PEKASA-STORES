@@ -121,7 +121,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       supabaseCloudSync.startLiveSync(
         async (bytes) => { await sqliteService.restoreFromSqliteBinary(bytes); },
         () => sqliteService.exportDatabaseBinary(),
-        async (bytes, deviceId) => { await sqliteService.mergeFromSqliteBinary(bytes, deviceId); },
+        async (bytes, deviceId, preferRemoteUntimestamped) => { await sqliteService.mergeFromSqliteBinary(bytes, deviceId, preferRemoteUntimestamped); },
       );
       setIsLoading(false);
     });
