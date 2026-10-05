@@ -44,11 +44,12 @@ class SupabaseCloudSync {
   private pendingBytes: Uint8Array | null = null;
   private lastRemoteUpdatedAt: string | null = null;
   private lastLocalWriteAt: string | null = null;
+  private localDirtyAt: number | null = null;
   private conflict: Conflict | null = null;
   private applyingRemote = false;
   private uploadInProgress = false;
   private applyRemote: ((bytes: Uint8Array) => Promise<void>) | null = null;
-  private mergeRemote: ((bytes: Uint8Array, deviceId: string) => Promise<void>) | null = null;
+  private mergeRemote: ((bytes: Uint8Array, deviceId: string, preferRemoteUntimestamped: boolean) => Promise<void>) | null = null;
   private readLocal: (() => Uint8Array) | null = null;
   private status: Status = 'signed-out';
   private errorMessage = '';
@@ -193,7 +194,7 @@ class SupabaseCloudSync {
   startLiveSync(
     applyRemote: (bytes: Uint8Array) => Promise<void>,
     readLocal: () => Uint8Array,
-    mergeRemote?: (bytes: Uint8Array, deviceId: string) => Promise<void>,
+    mergeRemote?: (bytes: Uint8Array, deviceId: string, preferRemoteUntimestamped: boolean) => Promise<void>,
   ) {
     this.stopLiveSync();
     this.applyRemote = applyRemote;
@@ -221,6 +222,7 @@ class SupabaseCloudSync {
   queueUpload(bytes: Uint8Array) {
     if (!this.session || !this.readLocal || this.applyingRemote) return;
     this.pendingBytes = bytes.slice();
+    this.localDirtyAt = Date.now();
     this.setState('syncing');
     if (this.timer !== null) window.clearTimeout(this.timer);
     this.timer = window.setTimeout(() => void this.flushUpload(false), 700);
@@ -257,7 +259,7 @@ class SupabaseCloudSync {
           }
           this.applyingRemote = true;
           try {
-            await this.mergeRemote(decodeBytes(current.snapshot_base64), current.device_id);
+            await this.mergeRemote(decodeBytes(current.snapshot_base64), current.device_id, Date.parse(current.updated_at) >= (this.localDirtyAt || 0));
           } finally {
             this.applyingRemote = false;
           }
@@ -312,6 +314,7 @@ class SupabaseCloudSync {
       }
       this.lastRemoteUpdatedAt = result[0].updated_at;
       this.lastLocalWriteAt = this.lastRemoteUpdatedAt;
+      this.localDirtyAt = null;
       this.setState('synced');
     } catch (error) {
       this.pendingBytes = bytes;
@@ -357,7 +360,7 @@ class SupabaseCloudSync {
         }
         this.applyingRemote = true;
         try {
-          await this.mergeRemote(decodeBytes(remote.snapshot_base64), remote.device_id);
+          await this.mergeRemote(decodeBytes(remote.snapshot_base64), remote.device_id, Date.parse(remote.updated_at) >= (this.localDirtyAt || 0));
         } finally {
           this.applyingRemote = false;
         }
@@ -375,6 +378,7 @@ class SupabaseCloudSync {
         this.applyingRemote = false;
       }
       this.lastRemoteUpdatedAt = remote.updated_at;
+      this.localDirtyAt = null;
       this.setState('synced');
     } catch (error) {
       this.setState('error', error instanceof Error ? error.message : 'Could not refresh the cloud snapshot.');
