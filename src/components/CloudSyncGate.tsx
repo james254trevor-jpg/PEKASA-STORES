@@ -31,13 +31,13 @@ export const CloudSyncGate: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     let mounted = true;
-    supabaseCloudSync.subscribe(() => setSync(supabaseCloudSync.getState()));
+    const unsubscribe = supabaseCloudSync.subscribe(() => setSync(supabaseCloudSync.getState()));
     supabaseCloudSync.restoreSession().then(async (saved) => {
       if (!mounted) return;
       if (saved) await openStore(saved);
       if (mounted) setChecking(false);
     }).catch(() => { if (mounted) setChecking(false); });
-    return () => { mounted = false; };
+    return () => { mounted = false; unsubscribe(); };
   }, []);
 
   useEffect(() => {
@@ -93,7 +93,7 @@ export const CloudSyncGate: React.FC<{ children: React.ReactNode }> = ({ childre
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.24em] text-amber-400">PEKASA STORES</p>
             <h1 className="mt-2 text-2xl font-bold">Connect your store account</h1>
-            <p className="mt-2 text-sm text-slate-400">Use the same Supabase account on your phone and PC to share store data.</p>
+            <p className="mt-2 text-sm text-slate-400">Use the same Supabase account on your phone and PC to share store data. Sign in first on the device that currently has your store data.</p>
           </div>
           <label className="block space-y-1 text-sm">Email<input required type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white" /></label>
           <label className="block space-y-1 text-sm">Password<input required minLength={8} type="password" autoComplete={creating ? 'new-password' : 'current-password'} value={password} onChange={(event) => setPassword(event.target.value)} className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white" /></label>
@@ -108,9 +108,9 @@ export const CloudSyncGate: React.FC<{ children: React.ReactNode }> = ({ childre
   return (
     <>
       {children}
-      <div className="fixed bottom-3 right-3 z-[100] rounded-full border border-slate-700 bg-slate-950/90 px-3 py-1.5 text-xs text-slate-200 shadow-lg" title={sync.error || sync.email}>
-        {sync.status === 'conflict' ? 'Store sync needs a choice' : sync.status === 'error' ? 'Store sync error' : sync.status === 'syncing' ? 'Saving store data…' : 'Store account connected'}
-      </div>
+      <button type="button" onClick={async () => { await supabaseCloudSync.signOut(); window.location.reload(); }} className="fixed bottom-3 right-3 z-[100] rounded-full border border-slate-700 bg-slate-950/90 px-3 py-1.5 text-xs text-slate-200 shadow-lg" title={sync.error || sync.email}>
+        {sync.status === 'conflict' ? 'Store sync needs a choice' : sync.status === 'error' ? 'Store sync error' : sync.status === 'syncing' ? 'Saving store data…' : 'Store account · sign out'}
+      </button>
       {sync.conflict && <div className="fixed inset-0 z-[200] grid place-items-center bg-black/60 p-4"><section role="alertdialog" aria-modal="true" className="w-full max-w-lg space-y-4 rounded-2xl bg-white p-6 text-slate-900 shadow-2xl"><h2 className="text-xl font-bold">Store data changed on another device</h2><p className="text-sm text-slate-600">Both devices have saved changes since the last sync. Choose which full store copy to keep. The other copy will be replaced.</p><div className="flex flex-col gap-2 sm:flex-row"><button onClick={() => void supabaseCloudSync.useCloudVersion()} className="flex-1 rounded-lg bg-slate-800 px-4 py-2 text-white">Use the other device’s copy</button><button onClick={() => void supabaseCloudSync.keepThisDeviceVersion()} className="flex-1 rounded-lg bg-amber-400 px-4 py-2 font-semibold">Keep this device’s copy</button></div></section></div>}
     </>
   );
