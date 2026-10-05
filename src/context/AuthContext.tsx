@@ -129,7 +129,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       loadData();
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      sqliteService.setCloudSyncHandler(null);
+      supabaseCloudSync.stopLiveSync();
+    };
   }, []);
 
   useEffect(() => {
