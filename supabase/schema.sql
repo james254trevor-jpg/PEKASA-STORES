@@ -7,6 +7,7 @@ create table if not exists public.pekasa_store_snapshots (
 );
 
 alter table public.pekasa_store_snapshots enable row level security;
+grant usage on schema public to authenticated;
 grant select, insert, update on public.pekasa_store_snapshots to authenticated;
 
 drop policy if exists "Users can read their own PEKASA store" on public.pekasa_store_snapshots;
