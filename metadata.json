@@ -2,5 +2,5 @@
   "name": "PEKASA STORES - Rehani & Pawn Management System",
   "description": "PEKASA STORES: Complete Rehani and Pawn Management System with WebAssembly SQLite, physical collateral vault tracking, pawn tickets, automatic item valuation, immutable ledger, and statutory disposition workflow.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": []
 }

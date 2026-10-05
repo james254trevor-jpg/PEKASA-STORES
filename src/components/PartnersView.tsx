@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { sqliteService } from '../db/sqlite';
 import { User, UserRole, Expense, Supplier, PaymentMethod, CashierSession, PaymentVoidRequest, AuditLog } from '../types';
 import { formatKES } from '../utils/numbering';
+import { cleanKenyanPhone } from '../utils/messaging';
 import { useAuth } from '../context/AuthContext';
 import { 
   Users, 
@@ -208,6 +209,11 @@ export const PartnersView: React.FC = () => {
       alert('Please fill in username, full name, and password.');
       return;
     }
+    // The sign-in OTP is texted to this number, so it must be a valid Kenyan mobile (07xx / 01xx / +254...)
+    if (!/^254[17]\d{8}$/.test(cleanKenyanPhone(newStaffPhone))) {
+      alert('Please enter a valid Kenyan mobile number for the cashier (e.g. 0712 345 678 or +254 712 345 678). The sign-in code is sent to it by SMS.');
+      return;
+    }
 
     try {
       await createUser({
@@ -224,7 +230,7 @@ export const PartnersView: React.FC = () => {
       setNewStaffPassword('');
       setNewStaffEmail('');
       setNewStaffPhone('+254 7');
-      alert(`Cashier account successfully provisioned by ${currentUser?.full_name || 'Admin'}. The cashier will sign in with their password and receive a 6-digit OTP code.`);
+      alert(`Cashier account successfully provisioned by ${currentUser?.full_name || 'Admin'}. When the cashier signs in with their password, a 6-digit code is sent by SMS to ${newStaffPhone.trim()}.`);
     } catch (err: any) {
       alert('Error creating cashier account: ' + err.message);
     }
