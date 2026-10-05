@@ -267,23 +267,50 @@ class SupabaseCloudSync {
         if (latest && !this.lastRemoteUpdatedAt) this.lastRemoteUpdatedAt = latest.updated_at;
       }
       const session = await this.ensureFreshSession();
-      const response = await fetch(TABLE_URL + '?on_conflict=user_id', {
-        method: 'POST',
-        headers: {
-          apikey: SUPABASE_PUBLISHABLE_KEY,
-          Authorization: 'Bearer ' + session.access_token,
-          'Content-Type': 'application/json',
-          Prefer: 'resolution=merge-duplicates,return=representation',
-        },
-        body: JSON.stringify({
-          user_id: session.user.id,
-          snapshot_base64: encodeBytes(bytes),
-          device_id: this.deviceId,
-        }),
-      });
+      const payload = {
+        snapshot_base64: encodeBytes(bytes),
+        device_id: this.deviceId,
+      };
+      let response: Response;
+      if (this.lastRemoteUpdatedAt) {
+        // Compare-and-set prevents a third device's write arriving between our
+        // read/merge and save from being silently overwritten.
+        const url = new URL(TABLE_URL);
+        url.searchParams.set('user_id', 'eq.' + session.user.id);
+        url.searchParams.set('updated_at', 'eq.' + this.lastRemoteUpdatedAt);
+        response = await fetch(url.toString(), {
+          method: 'PATCH',
+          headers: {
+            apikey: SUPABASE_PUBLISHABLE_KEY,
+            Authorization: 'Bearer ' + session.access_token,
+            'Content-Type': 'application/json',
+            Prefer: 'return=representation',
+          },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        response = await fetch(TABLE_URL + '?on_conflict=user_id', {
+          method: 'POST',
+          headers: {
+            apikey: SUPABASE_PUBLISHABLE_KEY,
+            Authorization: 'Bearer ' + session.access_token,
+            'Content-Type': 'application/json',
+            Prefer: 'resolution=merge-duplicates,return=representation',
+          },
+          body: JSON.stringify({ user_id: session.user.id, ...payload }),
+        });
+      }
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.message || 'Could not save the store snapshot.');
-      this.lastRemoteUpdatedAt = result[0]?.updated_at || this.lastRemoteUpdatedAt;
+      if (!result[0]?.updated_at) {
+        // The remote row changed after our merge. Keep the local work queued;
+        // the next pass reads and merges the newer cloud copy before retrying.
+        this.pendingBytes = bytes;
+        this.setState('syncing');
+        this.timer = window.setTimeout(() => void this.flushUpload(false), 700);
+        return;
+      }
+      this.lastRemoteUpdatedAt = result[0].updated_at;
       this.lastLocalWriteAt = this.lastRemoteUpdatedAt;
       this.setState('synced');
     } catch (error) {
