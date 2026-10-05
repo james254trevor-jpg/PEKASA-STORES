@@ -48,6 +48,7 @@ class SupabaseCloudSync {
   private applyingRemote = false;
   private uploadInProgress = false;
   private applyRemote: ((bytes: Uint8Array) => Promise<void>) | null = null;
+  private mergeRemote: ((bytes: Uint8Array, deviceId: string) => Promise<void>) | null = null;
   private readLocal: (() => Uint8Array) | null = null;
   private status: Status = 'signed-out';
   private errorMessage = '';
@@ -189,9 +190,14 @@ class SupabaseCloudSync {
     return decodeBytes(row.snapshot_base64);
   }
 
-  startLiveSync(applyRemote: (bytes: Uint8Array) => Promise<void>, readLocal: () => Uint8Array) {
+  startLiveSync(
+    applyRemote: (bytes: Uint8Array) => Promise<void>,
+    readLocal: () => Uint8Array,
+    mergeRemote?: (bytes: Uint8Array, deviceId: string) => Promise<void>,
+  ) {
     this.stopLiveSync();
     this.applyRemote = applyRemote;
+    this.mergeRemote = mergeRemote || null;
     this.readLocal = readLocal;
     this.deviceId = this.getDeviceId();
     this.setState('ready');
@@ -208,6 +214,7 @@ class SupabaseCloudSync {
     this.pendingBytes = null;
     this.conflict = null;
     this.applyRemote = null;
+    this.mergeRemote = null;
     this.readLocal = null;
   }
 
@@ -227,7 +234,7 @@ class SupabaseCloudSync {
   private async flushUpload(force: boolean) {
     if (!this.session || !this.pendingBytes || this.conflict || this.uploadInProgress) return;
     this.uploadInProgress = true;
-    const bytes = this.pendingBytes;
+    let bytes = this.pendingBytes;
     this.pendingBytes = null;
     if (this.timer !== null) window.clearTimeout(this.timer);
     this.timer = null;
@@ -238,10 +245,24 @@ class SupabaseCloudSync {
         if (latest && this.lastRemoteUpdatedAt && latest.updated_at !== this.lastRemoteUpdatedAt && latest.device_id !== this.deviceId) {
           const fullRows = await this.requestRows(true);
           const current = fullRows[0];
-          if (!current || current.updated_at !== latest.updated_at) return;
-          this.pendingBytes = bytes;
-          await this.createConflict(current, bytes);
-          return;
+          if (!current || current.updated_at !== latest.updated_at || !current.snapshot_base64) {
+            this.pendingBytes = bytes;
+            this.timer = window.setTimeout(() => void this.flushUpload(false), 700);
+            return;
+          }
+          if (!this.mergeRemote) {
+            this.pendingBytes = bytes;
+            await this.createConflict(current, bytes);
+            return;
+          }
+          this.applyingRemote = true;
+          try {
+            await this.mergeRemote(decodeBytes(current.snapshot_base64), current.device_id);
+          } finally {
+            this.applyingRemote = false;
+          }
+          this.lastRemoteUpdatedAt = current.updated_at;
+          bytes = this.readLocal ? this.readLocal() : bytes;
         }
         if (latest && !this.lastRemoteUpdatedAt) this.lastRemoteUpdatedAt = latest.updated_at;
       }
@@ -303,7 +324,21 @@ class SupabaseCloudSync {
       if (!remote || remote.updated_at !== metadata.updated_at || !remote.snapshot_base64) return;
       const localChangedAfterRemote = this.lastLocalWriteAt && Date.parse(remote.updated_at) > Date.parse(this.lastLocalWriteAt);
       if (this.pendingBytes || localChangedAfterRemote) {
-        await this.createConflict(remote, this.pendingBytes || (this.readLocal ? this.readLocal() : new Uint8Array()));
+        if (!this.mergeRemote) {
+          await this.createConflict(remote, this.pendingBytes || (this.readLocal ? this.readLocal() : new Uint8Array()));
+          return;
+        }
+        this.applyingRemote = true;
+        try {
+          await this.mergeRemote(decodeBytes(remote.snapshot_base64), remote.device_id);
+        } finally {
+          this.applyingRemote = false;
+        }
+        this.lastRemoteUpdatedAt = remote.updated_at;
+        this.lastLocalWriteAt = null;
+        this.pendingBytes = this.readLocal ? this.readLocal() : null;
+        this.setState('syncing');
+        await this.flushUpload(true);
         return;
       }
       this.applyingRemote = true;
