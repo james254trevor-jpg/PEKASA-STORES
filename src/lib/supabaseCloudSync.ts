@@ -365,7 +365,7 @@ class SupabaseCloudSync {
         this.lastLocalWriteAt = null;
         this.pendingBytes = this.readLocal ? this.readLocal() : null;
         this.setState('syncing');
-        await this.flushUpload(true);
+        await this.flushUpload(false);
         return;
       }
       this.applyingRemote = true;
