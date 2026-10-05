@@ -1,5 +1,5 @@
-const CACHE_NAME = 'pekasa-pwa-v1';
-const APP_SHELL = ['/', '/manifest.webmanifest', '/favicon.svg', '/icons/pekasa-192.png', '/icons/pekasa-512.png'];
+const CACHE_NAME = 'pekasa-pwa-v2';
+const APP_SHELL = ['/', '/manifest.webmanifest', '/favicon.svg', '/icons/pekasa-180.png', '/icons/pekasa-192.png', '/icons/pekasa-512.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

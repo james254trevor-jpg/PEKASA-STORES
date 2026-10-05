@@ -198,3 +198,21 @@ html.theme-light .glass-card {
 html.theme-light ::-webkit-scrollbar-track { background: #e2e8f0; }
 html.theme-light ::-webkit-scrollbar-thumb { background: #94a3b8; }
 html.theme-light ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+
+/* Light mode: keep the dark-first surface inversion, but give foregrounds and borders their own readable colors. */
+html.theme-light [class*="text-slate-600"]:not(.theme-static *),
+html.theme-light [class*="text-slate-700"]:not(.theme-static *),
+html.theme-light [class*="text-slate-800"]:not(.theme-static *),
+html.theme-light [class*="text-slate-900"]:not(.theme-static *),
+html.theme-light [class*="text-slate-950"]:not(.theme-static *) {
+  color: #334155;
+}
+html.theme-light [class*="text-slate-800"]:not(.theme-static *),
+html.theme-light [class*="text-slate-900"]:not(.theme-static *),
+html.theme-light [class*="text-slate-950"]:not(.theme-static *) {
+  color: #0f172a;
+}
+html.theme-light [class*="border-slate-"]:not(.theme-static *) {
+  border-color: #cbd5e1;
+}

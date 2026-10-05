@@ -1,4 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#0B2D4A"/>
-  <path fill="#FFD700" d="M18 13h29v9H27v8h18v9H27v12H18z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFF0B3"/>
+      <stop offset="0.48" stop-color="#D8B45A"/>
+      <stop offset="1" stop-color="#A87925"/>
+    </linearGradient>
+    <linearGradient id="teal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8BE5DD"/>
+      <stop offset="1" stop-color="#0ABAB5"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="#0B2D4A"/>
+  <rect x="60" y="60" width="392" height="392" rx="80" fill="none" stroke="url(#gold)" stroke-opacity=".72" stroke-width="3"/>
+  <path d="M148 390h216" stroke="url(#gold)" stroke-width="3" stroke-linecap="round" opacity=".62"/>
+  <text x="256" y="343" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="258" font-weight="700" letter-spacing="-34" fill="url(#gold)">P<tspan fill="url(#teal)">S</tspan></text>
+  <circle cx="256" cy="405" r="5" fill="#D8B45A"/>
 </svg>
