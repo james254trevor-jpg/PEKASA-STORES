@@ -2304,6 +2304,7 @@ class SQLiteService {
       parts: ['sku']
     };
     const suffix = sourceDeviceId.replace(/[^a-zA-Z0-9]/g, '').slice(-5) || Math.random().toString(36).slice(2, 7);
+    const remoteCodeRemaps: Record<string, Record<string, string>> = {};
     const readRows = (database: Database, sql: string): Array<Record<string, any>> => {
       const result = database.exec(sql)[0];
       if (!result) return [];
@@ -2338,7 +2339,13 @@ class SQLiteService {
         if (columns.length === 0 || pkColumns.length === 0) continue;
 
         const remoteRows = readRows(incoming, `SELECT * FROM ${quote(table)}`);
-        for (const remoteRow of remoteRows) {
+        for (const sourceRow of remoteRows) {
+          const remoteRow = { ...sourceRow };
+          for (const [column, mappings] of Object.entries(remoteCodeRemaps)) {
+            if (typeof remoteRow[column] === 'string' && mappings[remoteRow[column]]) {
+              remoteRow[column] = mappings[remoteRow[column]];
+            }
+          }
           const pkValues = pkColumns.map((column) => remoteRow[column]);
           if (pkValues.some((value) => value === null || value === undefined)) continue;
           const pkWhere = pkColumns.map((column, index) => `${quote(column)} = :pk${index}`).join(' AND ');
@@ -2374,6 +2381,8 @@ class SQLiteService {
                 candidate = `${original}-${suffix}-${attempt++}`;
               }
               mergedRow[column] = candidate;
+              remoteCodeRemaps[column] ||= {};
+              remoteCodeRemaps[column][original] = candidate;
             }
           }
 
