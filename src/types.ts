@@ -496,6 +496,14 @@ export interface Part {
   updated_at: string;
 }
 
+export interface PersonalGood {
+  id: string; item_name: string; category: string; details?: string; item_condition?: string;
+  purchase_price: number; asking_price: number; seller_name?: string; purchase_date: string;
+  status: 'IN_STOCK' | 'SOLD'; sale_price?: number | null; buyer_name?: string; buyer_phone?: string;
+  sale_date?: string | null; payment_method?: string; payment_reference?: string; notes?: string;
+  created_by: string; created_at: string; updated_at: string;
+}
+
 export interface StockMovement {
   id: string;
   part_id: string;
