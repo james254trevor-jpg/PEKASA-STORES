@@ -443,6 +443,17 @@ class SQLiteService {
       `);
 
       this.db.run(`
+        CREATE TABLE IF NOT EXISTS personal_goods (
+          id TEXT PRIMARY KEY, item_name TEXT NOT NULL, category TEXT NOT NULL DEFAULT 'Other',
+          details TEXT, item_condition TEXT, purchase_price REAL NOT NULL DEFAULT 0,
+          asking_price REAL NOT NULL DEFAULT 0, seller_name TEXT, purchase_date TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'IN_STOCK', sale_price REAL, buyer_name TEXT,
+          buyer_phone TEXT, sale_date TEXT, payment_method TEXT, payment_reference TEXT,
+          notes TEXT, created_by TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        );
+      `);
+
+      this.db.run(`
         CREATE TABLE IF NOT EXISTS stock_movements (
           id TEXT PRIMARY KEY,
           part_id TEXT NOT NULL,
@@ -947,6 +958,17 @@ class SQLiteService {
         location TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
+      );
+    `);
+
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS personal_goods (
+        id TEXT PRIMARY KEY, item_name TEXT NOT NULL, category TEXT NOT NULL DEFAULT 'Other',
+        details TEXT, item_condition TEXT, purchase_price REAL NOT NULL DEFAULT 0,
+        asking_price REAL NOT NULL DEFAULT 0, seller_name TEXT, purchase_date TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'IN_STOCK', sale_price REAL, buyer_name TEXT,
+        buyer_phone TEXT, sale_date TEXT, payment_method TEXT, payment_reference TEXT,
+        notes TEXT, created_by TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
       );
     `);
 
@@ -2111,6 +2133,34 @@ class SQLiteService {
     } catch {
       return [];
     }
+  }
+
+  public getPersonalGoods(): any[] {
+    try { return this.query('SELECT * FROM personal_goods ORDER BY created_at DESC'); } catch { return []; }
+  }
+
+  public addPersonalGood(data: any): void {
+    const now = new Date().toISOString();
+    this.run(`INSERT INTO personal_goods
+      (id, item_name, category, details, item_condition, purchase_price, asking_price, seller_name, purchase_date, status, notes, created_by, created_at, updated_at)
+      VALUES (:id, :item_name, :category, :details, :item_condition, :purchase_price, :asking_price, :seller_name, :purchase_date, 'IN_STOCK', :notes, :created_by, :created_at, :updated_at)`,
+      { ':id': crypto.randomUUID(), ':item_name': data.item_name, ':category': data.category || 'Other',
+        ':details': data.details || null, ':item_condition': data.item_condition || null,
+        ':purchase_price': Number(data.purchase_price), ':asking_price': Number(data.asking_price),
+        ':seller_name': data.seller_name || null, ':purchase_date': data.purchase_date,
+        ':notes': data.notes || null, ':created_by': data.created_by || 'Admin',
+        ':created_at': now, ':updated_at': now });
+  }
+
+  public recordPersonalGoodSale(id: string, data: any): void {
+    this.run(`UPDATE personal_goods SET status = 'SOLD', sale_price = :sale_price,
+      buyer_name = :buyer_name, buyer_phone = :buyer_phone, sale_date = :sale_date,
+      payment_method = :payment_method, payment_reference = :payment_reference, updated_at = :updated_at
+      WHERE id = :id AND status = 'IN_STOCK'`,
+      { ':id': id, ':sale_price': Number(data.sale_price), ':buyer_name': data.buyer_name || null,
+        ':buyer_phone': data.buyer_phone || null, ':sale_date': data.sale_date,
+        ':payment_method': data.payment_method || null, ':payment_reference': data.payment_reference || null,
+        ':updated_at': new Date().toISOString() });
   }
 
   public getSuppliers(): any[] {
