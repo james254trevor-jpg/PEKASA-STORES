@@ -2312,9 +2312,9 @@ class SQLiteService {
         Object.fromEntries(result.columns.map((column, index) => [column, values[index]]))
       );
     };
-    const existsBy = (table: string, column: string, value: unknown, pkColumns: string[], pkValues: unknown[]) => {
+    const existsBy = (table: string, column: string, value: any, pkColumns: string[], pkValues: any[]) => {
       const where = [`${quote(column)} = :value`, ...pkColumns.map((columnName, index) => `${quote(columnName)} != :pk${index}`)].join(' AND ');
-      const params: Record<string, unknown> = { ':value': value };
+      const params: Record<string, any> = { ':value': value };
       pkValues.forEach((pkValue, index) => { params[':pk' + index] = pkValue; });
       return this.query(`SELECT 1 AS found FROM ${quote(table)} WHERE ${where} LIMIT 1`, params).length > 0;
     };
@@ -2349,7 +2349,7 @@ class SQLiteService {
           const pkValues = pkColumns.map((column) => remoteRow[column]);
           if (pkValues.some((value) => value === null || value === undefined)) continue;
           const pkWhere = pkColumns.map((column, index) => `${quote(column)} = :pk${index}`).join(' AND ');
-          const pkParams: Record<string, unknown> = {};
+          const pkParams: Record<string, any> = {};
           pkValues.forEach((value, index) => { pkParams[':pk' + index] = value; });
           const localRow = this.query<Record<string, any>>(
             `SELECT * FROM ${quote(table)} WHERE ${pkWhere} LIMIT 1`,
@@ -2390,14 +2390,14 @@ class SQLiteService {
           if (localRow) {
             const assignments = writeColumns.map((column) => `${quote(column)} = :v_${column}`).join(', ');
             if (assignments) {
-              const params: Record<string, unknown> = { ...pkParams };
+              const params: Record<string, any> = { ...pkParams };
               writeColumns.forEach((column) => { params[':v_' + column] = mergedRow[column]; });
               this.db.run(`UPDATE ${quote(table)} SET ${assignments} WHERE ${pkWhere}`, params);
             }
           } else {
             const names = columns.map(quote).join(', ');
             const placeholders = columns.map((column) => ':v_' + column).join(', ');
-            const params: Record<string, unknown> = {};
+            const params: Record<string, any> = {};
             columns.forEach((column) => { params[':v_' + column] = mergedRow[column]; });
             this.db.run(`INSERT INTO ${quote(table)} (${names}) VALUES (${placeholders})`, params);
           }
