@@ -11,6 +11,7 @@ language plpgsql as $$
 declare n int;
 begin
   perform set_config('request.jwt.claim.sub', coalesce(uid::text, ''), true);
+  perform set_config('request.jwt.claims', case when uid is null then '' else json_build_object('sub', uid, 'otp_ok', true)::text end, true);
   execute format('set local role %I', as_role);
   execute stmt;
   get diagnostics n = row_count;

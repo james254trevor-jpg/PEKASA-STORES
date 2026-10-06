@@ -40,19 +40,19 @@ const lastSentAt = new Map<string, number>();
 
 const enc = new TextEncoder();
 
-const json = (body: unknown, status = 200): Response =>
+export const json = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), {
     status,
     headers: { 'content-type': 'application/json', 'cache-control': 'no-store' }
   });
 
-const toB64Url = (bytes: Uint8Array): string => {
+export const toB64Url = (bytes: Uint8Array): string => {
   let s = '';
   for (const b of bytes) s += String.fromCharCode(b);
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 };
 
-const fromB64Url = (str: string): Uint8Array => {
+export const fromB64Url = (str: string): Uint8Array => {
   const b64 = str.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((str.length + 3) % 4);
   const bin = atob(b64);
   const out = new Uint8Array(bin.length);
@@ -60,12 +60,12 @@ const fromB64Url = (str: string): Uint8Array => {
   return out;
 };
 
-const hmac = async (secret: string, message: string): Promise<Uint8Array> => {
+export const hmac = async (secret: string, message: string): Promise<Uint8Array> => {
   const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   return new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode(message)));
 };
 
-const timingSafeEqual = (a: Uint8Array, b: Uint8Array): boolean => {
+export const timingSafeEqual = (a: Uint8Array, b: Uint8Array): boolean => {
   if (a.length !== b.length) return false;
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
@@ -91,9 +91,9 @@ export const normalizeKenyanPhone = (raw: string): string | null => {
   return '+' + p;
 };
 
-const maskPhone = (e164: string): string => e164.slice(0, 7) + '•••' + e164.slice(-3);
+export const maskPhone = (e164: string): string => e164.slice(0, 7) + '•••' + e164.slice(-3);
 
-type SmsResult = { ok: boolean; error?: string };
+export type SmsResult = { ok: boolean; error?: string };
 
 /** Infobip: POST https://{base}/sms/2/text/advanced with "Authorization: App {key}". */
 const sendViaInfobip = async (env: Env, to: string, message: string): Promise<SmsResult> => {
@@ -125,7 +125,7 @@ const sendViaInfobip = async (env: Env, to: string, message: string): Promise<Sm
   }
 };
 
-const sendSms = async (env: Env, to: string, message: string): Promise<SmsResult> => {
+export const sendSms = async (env: Env, to: string, message: string): Promise<SmsResult> => {
   if (env.INFOBIP_API_KEY && env.INFOBIP_BASE_URL) return sendViaInfobip(env, to, message);
 
   const username = env.AT_USERNAME;
