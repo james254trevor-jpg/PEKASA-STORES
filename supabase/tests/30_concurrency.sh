@@ -10,7 +10,7 @@ out=$(mktemp); trap 'rm -f "$out"' EXIT
 
 worker() {
   for _ in $(seq "$PER_WORKER"); do
-    psql -qAt -c "set request.jwt.claim.sub = '00000000-0000-0000-0000-0000000000c1'; set role authenticated; select public.next_sequence('TXN');" | tail -1
+    psql -qAt -c "select set_config('request.jwt.claims', '{\"sub\":\"00000000-0000-0000-0000-0000000000c1\",\"otp_ok\":true}', false); set role authenticated; select public.next_sequence('TXN');" | tail -1
   done
 }
 export -f worker; export PER_WORKER

@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test": "node --test \"server/**/*.test.ts\""
+    "test": "node --test \"server/**/*.test.ts\" \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.11",

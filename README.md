@@ -9,7 +9,7 @@ the ledger, treasury and cashier sessions; customers see the public storefront.
 ```bash
 npm install
 npm run dev        # http://localhost:3000
-npm test           # unit tests for the OTP service
+npm test           # unit tests (SMS code service, Supabase sign-in, data layer)
 npm run build      # production build into dist/
 ```
 
@@ -19,7 +19,7 @@ The database is **SQLite running inside each browser** (stored in that browser's
 
 - Data is **not shared** between computers, and clearing browser data **erases it**.
 - Use **Backup → Export** regularly and keep the `.sqlite` file somewhere safe.
-- Moving to a hosted database is planned. See [`docs/SUPABASE_MIGRATION.md`](docs/SUPABASE_MIGRATION.md).
+- The move to a hosted database (Supabase) is built behind an off-by-default switch and is not live yet. See [`docs/SUPABASE_MIGRATION.md`](docs/SUPABASE_MIGRATION.md).
 
 ## Cashier sign-in codes (SMS)
 

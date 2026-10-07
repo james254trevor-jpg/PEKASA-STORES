@@ -14,7 +14,41 @@ jobs:
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund
-      - name: Unit tests (OTP service)
+      - name: Unit tests
         run: npm test
       - name: Production build
         run: npm run build
+
+  database-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare scratch database (shim + all migrations)
+        run: |
+          psql -c "create database pekasa_test" postgres
+          export PGDATABASE=pekasa_test
+          psql -v ON_ERROR_STOP=1 -q -f supabase/tests/00_supabase_shim.sql
+          for f in supabase/migrations/*.sql; do psql -v ON_ERROR_STOP=1 -q -f "$f"; done
+      - name: Access rules, branches, roles, append-only (RLS)
+        run: PGDATABASE=pekasa_test psql -v ON_ERROR_STOP=1 -q -f supabase/tests/10_rls_test.sql
+      - name: Sequences and sign-in code tracking
+        run: PGDATABASE=pekasa_test psql -v ON_ERROR_STOP=1 -q -f supabase/tests/20_sequences_and_otp_test.sql
+      - name: Concurrency (no duplicate numbers)
+        run: PGDATABASE=pekasa_test supabase/tests/30_concurrency.sh
+      - name: SMS session gate
+        run: PGDATABASE=pekasa_test psql -v ON_ERROR_STOP=1 -q -f supabase/tests/40_otp_gate_test.sql
+      - name: Backup import
+        run: supabase/tests/50_import_test.sh
