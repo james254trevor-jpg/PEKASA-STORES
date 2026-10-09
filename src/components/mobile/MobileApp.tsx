@@ -14,7 +14,7 @@ import { MobileMoreView } from './MobileMoreView';
 import { PersonalGoodsView } from '../PersonalGoodsView';
 import { MobileNotificationsSheet } from './MobileNotificationsSheet';
 import { MobileAddProductModal } from './MobileAddProductModal';
-import { MobileAddCustomerModal } from './MobileAddCustomerModal';
+import { AddCustomerWithItemsModal } from '../AddCustomerWithItemsModal';
 import { UserProfileView } from '../UserProfileView';
 import { SettingsView } from '../SettingsView';
 import { BackupRestoreModal } from '../BackupRestoreModal';
@@ -292,7 +292,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({ onSwitchToDesktop }) => {
                 className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-white hover:bg-white/10 flex items-center gap-2"
               >
                 <span className="w-2 h-2 rounded-full bg-purple-400" />
-                <span>+ Add Customer</span>
+                <span>+ Add Customer & Item</span>
               </button>
             </div>
           )}
@@ -325,12 +325,10 @@ export const MobileApp: React.FC<MobileAppProps> = ({ onSwitchToDesktop }) => {
         }}
       />
 
-      <MobileAddCustomerModal
+      <AddCustomerWithItemsModal
         isOpen={isAddCustomerOpen}
         onClose={() => setIsAddCustomerOpen(false)}
-        onSuccess={(c) => {
-          setSelectedCustomer(c);
-        }}
+        defaultBranchId="br-nairobi"
       />
 
       <BackupRestoreModal
