@@ -539,6 +539,11 @@ class SQLiteService {
       try { this.db.run('ALTER TABLE customers ADD COLUMN id_photo_url TEXT;'); } catch {}
       try { this.db.run('ALTER TABLE customers ADD COLUMN status TEXT DEFAULT "Good Standing";'); } catch {}
       try { this.db.run('ALTER TABLE customers ADD COLUMN defaults_count INTEGER DEFAULT 0;'); } catch {}
+      // Intake forms write these loan-history columns, so older databases need them too.
+      try { this.db.run('ALTER TABLE customers ADD COLUMN previous_loans_count INTEGER DEFAULT 0;'); } catch {}
+      try { this.db.run('ALTER TABLE customers ADD COLUMN total_borrowed REAL DEFAULT 0;'); } catch {}
+      try { this.db.run('ALTER TABLE customers ADD COLUMN total_repaid REAL DEFAULT 0;'); } catch {}
+      try { this.db.run('ALTER TABLE customers ADD COLUMN current_balance REAL DEFAULT 0;'); } catch {}
 
       // Business settings table
       this.db.run(`
@@ -643,6 +648,10 @@ class SQLiteService {
         id_photo_url TEXT,
         status TEXT NOT NULL DEFAULT 'Good Standing',
         notes TEXT,
+        previous_loans_count INTEGER DEFAULT 0,
+        total_borrowed REAL DEFAULT 0,
+        total_repaid REAL DEFAULT 0,
+        current_balance REAL DEFAULT 0,
         defaults_count INTEGER DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
@@ -2180,17 +2189,22 @@ class SQLiteService {
 
   public updateCustomer(id: string, data: Partial<Customer>): void {
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    // Optional text fields can be cleared: when the key is passed (even empty) it is written;
+    // when the key is absent the stored value is kept.
+    const has = (key: keyof Customer) => (key in data ? 1 : 0);
     this.run(
       `UPDATE customers SET
         name = COALESCE(:name, name),
         id_number = COALESCE(:id_number, id_number),
         phone = COALESCE(:phone, phone),
         alt_phone = COALESCE(:alt_phone, alt_phone),
-        address = COALESCE(:address, address),
+        email = CASE WHEN :has_email = 1 THEN :email ELSE email END,
+        address = CASE WHEN :has_address = 1 THEN :address ELSE address END,
         county = COALESCE(:county, county),
         photo_url = COALESCE(:photo_url, photo_url),
+        id_photo_url = COALESCE(:id_photo_url, id_photo_url),
         status = COALESCE(:status, status),
-        notes = COALESCE(:notes, notes),
+        notes = CASE WHEN :has_notes = 1 THEN :notes ELSE notes END,
         updated_at = :now
        WHERE id = :id`,
       {
@@ -2199,10 +2213,15 @@ class SQLiteService {
         ':id_number': data.id_number || null,
         ':phone': data.phone || null,
         ':alt_phone': data.alt_phone || null,
+        ':has_email': has('email'),
+        ':email': data.email || null,
+        ':has_address': has('address'),
         ':address': data.address || null,
         ':county': data.county || null,
         ':photo_url': data.photo_url || null,
+        ':id_photo_url': data.id_photo_url || null,
         ':status': data.status || null,
+        ':has_notes': has('notes'),
         ':notes': data.notes || null,
         ':now': now
       }
