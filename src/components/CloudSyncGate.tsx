@@ -98,7 +98,7 @@ export const CloudSyncGate: React.FC<{ children: React.ReactNode }> = ({ childre
     <>
       {children}
       <div className="fixed bottom-3 right-3 z-[100] flex items-center gap-2 rounded-full border border-slate-700 bg-slate-950/90 px-3 py-1.5 text-xs text-slate-200 shadow-lg" title={sync.error || sync.email}>
-        <span>{sync.status === 'conflict' ? 'Store sync needs a choice' : sync.status === 'error' ? 'Store sync error' : sync.status === 'syncing' ? 'Saving store data…' : 'Store account connected'}</span>
+        {sync.status !== 'ready' && sync.status !== 'synced' && <span>{sync.status === 'conflict' ? 'Store sync needs a choice' : sync.status === 'error' ? 'Store sync error' : 'Saving store data…'}</span>}
         {sync.status === 'error' && <button type="button" onClick={() => void supabaseCloudSync.retryPending()} className="underline">Retry</button>}
         <button type="button" disabled={sync.status === 'syncing' || sync.status === 'conflict' || sync.status === 'error'} onClick={async () => { await supabaseCloudSync.signOut(); window.location.reload(); }} className="underline disabled:opacity-50">Sign out</button>
       </div>
