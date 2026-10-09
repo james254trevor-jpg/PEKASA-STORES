@@ -284,10 +284,11 @@ export const AppliancesView: React.FC<AppliancesViewProps> = ({
     const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
     try {
       sqliteService.run(
-        `INSERT INTO customers (id, name, id_number, phone, email, address, photo_url, notes, created_at, updated_at)
-         VALUES (:id, :name, :id_number, :phone, NULL, :address, NULL, 'Registered during collateral loan intake', :created_at, :updated_at)`,
+        `INSERT INTO customers (id, customer_number, name, id_number, phone, alt_phone, email, address, county, photo_url, status, notes, created_at, updated_at)
+         VALUES (:id, :cnum, :name, :id_number, :phone, 'N/A', NULL, :address, 'Nairobi', NULL, 'Good Standing', 'Registered during collateral loan intake', :created_at, :updated_at)`,
         {
           ':id': id,
+          ':cnum': sqliteService.getNextSequence('CUS'),
           ':name': quickCustName.trim(),
           ':id_number': quickCustIdNumber.trim(),
           ':phone': quickCustPhone.trim(),
