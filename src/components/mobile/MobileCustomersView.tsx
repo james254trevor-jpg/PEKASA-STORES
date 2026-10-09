@@ -50,7 +50,7 @@ export const MobileCustomersView: React.FC<MobileCustomersViewProps> = ({
           className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0ABAB5] hover:bg-[#1FD2CD] text-black font-extrabold text-xs shadow-md shadow-[#0ABAB5]/20 active:scale-95 transition-all"
         >
           <Plus className="w-4 h-4" />
-          <span>Add Customer</span>
+          <span>Add Customer + Item</span>
         </button>
       </div>
 
