@@ -158,10 +158,10 @@ export const MobileApp: React.FC<MobileAppProps> = ({ onSwitchToDesktop }) => {
           />
         ) : activeSubView === 'loans' ? (
           /* Loans View */
-          <LoansView selectedBranchId="ALL" onOpenAddCustomerWithItems={() => setIsAddProductOpen(true)} />
+          <LoansView selectedBranchId="ALL" onOpenAddCustomerWithItems={() => setIsAddCustomerOpen(true)} />
         ) : activeSubView === 'collateral' ? (
           /* Collateral View */
-          <CollateralView selectedBranchId="ALL" onOpenAddCustomerWithItems={() => setIsAddProductOpen(true)} />
+          <CollateralView selectedBranchId="ALL" onOpenAddCustomerWithItems={() => setIsAddCustomerOpen(true)} />
         ) : activeSubView === 'reports' ? (
           /* Reports View */
           <TreasuryExpensesView selectedBranchId="ALL" />
