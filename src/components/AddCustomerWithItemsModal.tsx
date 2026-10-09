@@ -60,8 +60,11 @@ export const AddCustomerWithItemsModal: React.FC<AddCustomerWithItemsModalProps>
 
   // Hidden file inputs
   const customerPhotoRef = useRef<HTMLInputElement>(null);
+  const customerPhotoCameraRef = useRef<HTMLInputElement>(null);
   const idDocumentPhotoRef = useRef<HTMLInputElement>(null);
+  const idDocumentCameraRef = useRef<HTMLInputElement>(null);
   const photoFrontRef = useRef<HTMLInputElement>(null);
+  const photoFrontCameraRef = useRef<HTMLInputElement>(null);
   const photoBackRef = useRef<HTMLInputElement>(null);
   const photoSerialRef = useRef<HTMLInputElement>(null);
   const photoDamageRef = useRef<HTMLInputElement>(null);
@@ -109,8 +112,8 @@ export const AddCustomerWithItemsModal: React.FC<AddCustomerWithItemsModalProps>
   const [phone, setPhone] = useState('+254 ');
   const [altPhone, setAltPhone] = useState('N/A');
   const [email, setEmail] = useState('');
-  const [address, setAddress] = useState('');
-  const [county, setCounty] = useState('Nairobi');
+  const [address, setAddress] = useState('Kombani');
+  const [county, setCounty] = useState('Kwale');
   const [notes, setNotes] = useState('');
   const [customerPhoto, setCustomerPhoto] = useState<string>('');
   const [idPhoto, setIdPhoto] = useState<string>('');
@@ -563,8 +566,8 @@ export const AddCustomerWithItemsModal: React.FC<AddCustomerWithItemsModalProps>
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-xl p-4 overflow-y-auto">
-      <div className="w-full max-w-4xl glass-panel border border-white/20 rounded-3xl shadow-2xl p-6 space-y-6 my-6 max-h-[94vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-xl p-0 sm:p-4 overflow-y-auto">
+      <div className="w-full h-full sm:h-auto max-w-4xl glass-panel border border-white/20 sm:rounded-3xl shadow-2xl p-4 sm:p-6 space-y-6 sm:my-6 max-h-screen sm:max-h-[94vh] overflow-y-auto">
         
         {/* Header Bar */}
         <div className="flex items-center justify-between border-b border-white/10 pb-4">
@@ -751,21 +754,14 @@ export const AddCustomerWithItemsModal: React.FC<AddCustomerWithItemsModalProps>
                       <span className="font-bold text-white text-[11px] block">Customer Photo</span>
                       <button
                         type="button"
-                        onClick={() => customerPhotoRef.current?.click()}
-                        className="px-2.5 py-1 bg-[#0ABAB5] hover:bg-[#1FD2CD] text-black font-bold rounded-lg text-[11px] cursor-pointer"
+                        onClick={() => customerPhotoCameraRef.current?.click()}
+                        className="px-2.5 py-1 bg-[#0ABAB5] hover:bg-[#1FD2CD] text-black font-bold rounded-lg text-[11px] cursor-pointer inline-flex items-center gap-1"
                       >
-                        {customerPhoto ? 'Change Photo' : 'Upload / Snap Photo'}
+                        <Camera className="w-3 h-3" /> Camera
                       </button>
-                      <input
-                        ref={customerPhotoRef}
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) processImageFile(f, setCustomerPhoto);
-                        }}
-                        className="hidden"
-                      />
+                      <button type="button" onClick={() => customerPhotoRef.current?.click()} className="px-2.5 py-1 bg-white/15 hover:bg-white/25 text-white font-bold rounded-lg text-[11px] cursor-pointer inline-flex items-center gap-1"><Upload className="w-3 h-3" /> Upload</button>
+                      <input ref={customerPhotoCameraRef} type="file" accept="image/*" capture="user" onChange={(e) => { const f = e.target.files?.[0]; if (f) processImageFile(f, setCustomerPhoto); }} className="hidden" />
+                      <input ref={customerPhotoRef} type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) processImageFile(f, setCustomerPhoto); }} className="hidden" />
                     </div>
                   </div>
 
@@ -791,21 +787,14 @@ export const AddCustomerWithItemsModal: React.FC<AddCustomerWithItemsModalProps>
                       <span className="font-bold text-white text-[11px] block">ID / Passport Document Photo</span>
                       <button
                         type="button"
-                        onClick={() => idDocumentPhotoRef.current?.click()}
-                        className="px-2.5 py-1 bg-white/15 hover:bg-white/25 text-white font-bold rounded-lg text-[11px] cursor-pointer"
+                        onClick={() => idDocumentCameraRef.current?.click()}
+                        className="px-2.5 py-1 bg-[#0ABAB5] hover:bg-[#1FD2CD] text-black font-bold rounded-lg text-[11px] cursor-pointer inline-flex items-center gap-1"
                       >
-                        {idPhoto ? 'Change ID Photo' : 'Upload / Snap ID Card'}
+                        <Camera className="w-3 h-3" /> Camera
                       </button>
-                      <input
-                        ref={idDocumentPhotoRef}
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) processImageFile(f, setIdPhoto);
-                        }}
-                        className="hidden"
-                      />
+                      <button type="button" onClick={() => idDocumentPhotoRef.current?.click()} className="px-2.5 py-1 bg-white/15 hover:bg-white/25 text-white font-bold rounded-lg text-[11px] cursor-pointer inline-flex items-center gap-1"><Upload className="w-3 h-3" /> Upload</button>
+                      <input ref={idDocumentCameraRef} type="file" accept="image/*" capture="environment" onChange={(e) => { const f = e.target.files?.[0]; if (f) processImageFile(f, setIdPhoto); }} className="hidden" />
+                      <input ref={idDocumentPhotoRef} type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) processImageFile(f, setIdPhoto); }} className="hidden" />
                     </div>
                   </div>
                 </div>
@@ -895,6 +884,7 @@ export const AddCustomerWithItemsModal: React.FC<AddCustomerWithItemsModalProps>
                       <option value="Nairobi" className="bg-slate-900">Nairobi</option>
                       <option value="Kiambu" className="bg-slate-900">Kiambu</option>
                       <option value="Mombasa" className="bg-slate-900">Mombasa</option>
+                      <option value="Kwale" className="bg-slate-900">Kwale</option>
                       <option value="Nakuru" className="bg-slate-900">Nakuru</option>
                       <option value="Eldoret / Uasin Gishu" className="bg-slate-900">Eldoret / Uasin Gishu</option>
                       <option value="Machakos" className="bg-slate-900">Machakos</option>
@@ -1012,6 +1002,21 @@ export const AddCustomerWithItemsModal: React.FC<AddCustomerWithItemsModalProps>
                     <span>Pledged Collateral Specification & Vault Storage</span>
                   </span>
                   <span className="text-[10px] text-[#0ABAB5] font-mono font-bold">COL Unique Identifier</span>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10 flex items-center gap-3">
+                  <div className="w-16 h-16 rounded-xl border border-dashed border-[#0ABAB5]/50 bg-slate-900 flex items-center justify-center overflow-hidden shrink-0">
+                    {photoFront ? <img src={photoFront} alt="Collateral item" className="w-full h-full object-cover" /> : <Package className="w-6 h-6 text-slate-600" />}
+                  </div>
+                  <div className="space-y-2">
+                    <span className="font-bold text-white text-[11px] block">Item Photo</span>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => photoFrontCameraRef.current?.click()} className="px-2.5 py-1 bg-[#0ABAB5] text-black font-bold rounded-lg text-[11px] inline-flex items-center gap-1"><Camera className="w-3 h-3" /> Camera</button>
+                      <button type="button" onClick={() => photoFrontRef.current?.click()} className="px-2.5 py-1 bg-white/15 text-white font-bold rounded-lg text-[11px] inline-flex items-center gap-1"><Upload className="w-3 h-3" /> Upload</button>
+                    </div>
+                    <input ref={photoFrontCameraRef} type="file" accept="image/*" capture="environment" onChange={(e) => { const f = e.target.files?.[0]; if (f) processImageFile(f, setPhotoFront); }} className="hidden" />
+                    <input ref={photoFrontRef} type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) processImageFile(f, setPhotoFront); }} className="hidden" />
+                  </div>
                 </div>
 
                 {/* Category & Custom Category */}
