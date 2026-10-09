@@ -884,6 +884,7 @@ export const AddCustomerWithItemsModal: React.FC<AddCustomerWithItemsModalProps>
                       <option value="Nairobi" className="bg-slate-900">Nairobi</option>
                       <option value="Kiambu" className="bg-slate-900">Kiambu</option>
                       <option value="Mombasa" className="bg-slate-900">Mombasa</option>
+                      <option value="Kwale" className="bg-slate-900">Kwale</option>
                       <option value="Nakuru" className="bg-slate-900">Nakuru</option>
                       <option value="Eldoret / Uasin Gishu" className="bg-slate-900">Eldoret / Uasin Gishu</option>
                       <option value="Machakos" className="bg-slate-900">Machakos</option>
