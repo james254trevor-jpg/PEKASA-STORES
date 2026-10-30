@@ -1,14 +1,26 @@
 import {createRoot} from 'react-dom/client';
-import App from './App.tsx';
 import './index.css';
-import { PwaInstallPrompt } from './components/PwaInstallPrompt';
+import { STORE_LOCKED } from './lib/storeLock';
+import { StoreLockScreen } from './components/StoreLockScreen';
 
-createRoot(document.getElementById('root')!).render(
-  <>
-    <App />
-    <PwaInstallPrompt />
-  </>,
-);
+const root = createRoot(document.getElementById('root')!);
+
+if (STORE_LOCKED) {
+  // Locked: the app, the Supabase login and cloud sync are never loaded.
+  root.render(<StoreLockScreen />);
+} else {
+  void Promise.all([
+    import('./App.tsx'),
+    import('./components/PwaInstallPrompt'),
+  ]).then(([{ default: App }, { PwaInstallPrompt }]) => {
+    root.render(
+      <>
+        <App />
+        <PwaInstallPrompt />
+      </>,
+    );
+  });
+}
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
